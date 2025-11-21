@@ -10,7 +10,11 @@
 </template>
 
 <script setup lang="ts">
+import type { HTMLContent, JSONContent } from '@tiptap/core'
+import type { DocumentOptions, PageOption } from '@/types'
+
 import { shortId } from '@/utils/short-id'
+import { createDealEditorOptions } from '@/deal-options'
 
 const editorRef = $ref(null)
 const templates = [
@@ -27,96 +31,94 @@ const templates = [
       '<h1>工作周报</h1><h2>本周工作总结</h2><hr /><h3>已完成工作：</h3><ul><li>[任务1名称]：[简要描述任务内容及完成情况]</li><li>[任务2名称]：[简要描述任务内容及完成情况]</li><li>...</li></ul><h3>进行中工作：</h3><ul><li>[任务1名称]：[简要描述任务当前进度和下一步计划]</li><li>[任务2名称]：[简要描述任务当前进度和下一步计划]</li><li>...</li></ul><h3>问题与挑战：</h3><ul><li>[问题1]：[描述遇到的问题及当前解决方案或需要的支持]</li><li>[问题2]：[描述遇到的问题及当前解决方案或需要的支持]</li><li>...</li></ul><hr /><h2>下周工作计划</h2><h3>计划开展工作：</h3><ul><li>[任务1名称]：[简要描述下周计划开始的任务内容]</li><li>[任务2名称]：[简要描述下周计划开始的任务内容]</li><li>...</li></ul><h3>需要支持与资源：</h3><ul><li>[资源1]：[描述需要的资源或支持]</li><li>[资源2]：[描述需要的资源或支持]</li><li>...</li></ul>',
   },
 ]
-const options = $ref({
-  toolbar: {
-    // defaultMode: 'classic',
-    // menus: ['base'],
-  },
-  document: {
-    title: '测试文档',
-    content: localStorage.getItem('document.content') ?? '<p>测试文档</p>',
-    characterLimit: 10000,
-  },
-  page: {
-    layouts: ['page', 'web'],
-    showBookmark: true,
-  },
-  templates,
-  cdnUrl: 'https://cdn.umodoc.com',
-  shareUrl: 'https://www.umodoc.com',
-  file: {
-    // allowedMimeTypes: [
-    //   'application/pdf',
-    //   'image/svg+xml',
-    //   'video/mp4',
-    //   'audio/*',
-    // ],
-  },
-  importWord: {
-    enabled: true,
-    // async onCustomImportMethod() {
-    //   return await Promise.resolve({
-    //     value: '<p>测试导入word</p>',
-    //   })
-    // },
-  },
-  ai: {
-    assistant: {
+const options = $ref(
+  createDealEditorOptions({
+    document: {
+      title: '测试文档',
+      content: localStorage.getItem('document.content') ?? '<p>测试文档</p>',
+      characterLimit: 10000,
+    },
+    templates,
+    cdnUrl: 'https://cdn.umodoc.com',
+    shareUrl: 'https://www.umodoc.com',
+    file: {
+      // allowedMimeTypes: [
+      //   'application/pdf',
+      //   'image/svg+xml',
+      //   'video/mp4',
+      //   'audio/*',
+      // ],
+    },
+    importWord: {
       enabled: true,
-      async onMessage() {
-        return await Promise.resolve('<p>AI助手测试</p>')
+      // async onCustomImportMethod() {
+      //   return await Promise.resolve({
+      //     value: '<p>测试导入word</p>',
+      //   })
+      // },
+    },
+    ai: {
+      assistant: {
+        enabled: true,
+        async onMessage() {
+          return await Promise.resolve('<p>AI助手测试</p>')
+        },
       },
     },
-  },
-  user: {
-    id: 'umoeditor',
-    label: 'Umo Editor',
-    avatar: 'https://tdesign.gtimg.com/site/avatar.jpg',
-  },
-  users: [
-    { id: 'umodoc', label: 'Umo Team' },
-    { id: 'Cassielxd', label: 'Cassielxd' },
-    { id: 'Goldziher', label: "Na'aman Hirschfeld" },
-    { id: 'SerRashin', label: 'SerRashin' },
-    { id: 'ChenErik', label: 'ChenErik' },
-    { id: 'china-wangxu', label: 'china-wangxu' },
-    { id: 'Sherman Xu', label: 'xuzhenjun130' },
-    { id: 'testuser', label: '测试用户' },
-  ],
-  // https://dev.umodoc.com/cn/docs/options/extensions#disableextensions
-  disableExtensions: ['file'],
-  async onSave(content: string, page: number, document: { content: string }) {
-    localStorage.setItem('document.content', document.content)
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const success = true
-        if (success) {
-          console.log('onSave', { content, page, document })
-          resolve('操作成功')
-        } else {
-          reject(new Error('操作失败'))
-        }
-      }, 2000)
-    })
-  },
-  async onFileUpload(file: File & { url?: string }) {
-    if (!file) {
-      throw new Error('没有找到要上传的文件')
-    }
-    console.log('onUpload', file)
-    await new Promise((resolve) => setTimeout(resolve, 3000))
-    return {
-      id: shortId(),
-      url: file.url ?? URL.createObjectURL(file),
-      name: file.name,
-      type: file.type,
-      size: file.size,
-    }
-  },
-  onFileDelete(id: string, url: string, type: string) {
-    console.log(id, url, type)
-  },
-})
+    user: {
+      id: 'umoeditor',
+      label: 'Umo Editor',
+      avatar: 'https://tdesign.gtimg.com/site/avatar.jpg',
+    },
+    users: [
+      { id: 'umodoc', label: 'Umo Team' },
+      { id: 'Cassielxd', label: 'Cassielxd' },
+      { id: 'Goldziher', label: "Na'aman Hirschfeld" },
+      { id: 'SerRashin', label: 'SerRashin' },
+      { id: 'ChenErik', label: 'ChenErik' },
+      { id: 'china-wangxu', label: 'china-wangxu' },
+      { id: 'Sherman Xu', label: 'xuzhenjun130' },
+      { id: 'testuser', label: '测试用户' },
+    ],
+    async onSave(
+      content: { html: HTMLContent; json: JSONContent; text: string },
+      page: PageOption,
+      document: DocumentOptions,
+    ) {
+      if (typeof document.content === 'string') {
+        localStorage.setItem('document.content', document.content)
+      }
+      return new Promise((resolve, reject) => {
+        setTimeout(() => {
+          const success = true
+          if (success) {
+            console.log('onSave', { content, page, document })
+            resolve('操作成功')
+          } else {
+            reject(new Error('操作失败'))
+          }
+        }, 2000)
+      })
+    },
+    async onFileUpload(file: File & { url?: string }) {
+      if (!file) {
+        throw new Error('没有找到要上传的文件')
+      }
+      console.log('onUpload', file)
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+      return {
+        id: shortId(),
+        url: file.url ?? URL.createObjectURL(file),
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      }
+    },
+    onFileDelete(id: string, url: string, type: string) {
+      console.log(id, url, type)
+    },
+  }),
+)
 </script>
 
 <style>

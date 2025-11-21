@@ -493,6 +493,8 @@ watch(
 const localeConfig = $ref<Record<string, GlobalConfigProvider>>({
   'zh-CN': cnConfig as unknown as GlobalConfigProvider,
   'en-US': enConfig as unknown as GlobalConfigProvider,
+  'ru-RU': enConfig as unknown as GlobalConfigProvider,
+  'kk-KZ': enConfig as unknown as GlobalConfigProvider,
 })
 
 // Options Setup
@@ -805,8 +807,10 @@ const getContent = <T extends 'html' | 'json' | 'text' = 'html'>(
 
 // Locale Methods
 const setLocale = (params: SupportedLocale) => {
-  if (!['zh-CN', 'en-US'].includes(params)) {
-    throw new Error('"params" must be one of "zh-CN" or "en-US".')
+  if (!['zh-CN', 'en-US', 'ru-RU', 'kk-KZ'].includes(params)) {
+    throw new Error(
+      '"params" must be one of "zh-CN", "en-US", "ru-RU" or "kk-KZ".',
+    )
   }
   if (locale.value === params) {
     return
@@ -1268,6 +1272,58 @@ defineExpose({
   getSelectionText: () => (editor.value ? getSelectionText(editor.value) : ''),
   getSelectionNode: () =>
     editor.value ? getSelectionNode(editor.value) : null,
+  /**
+   * Возвращает clauseId текущего абзаца или заголовка по текущему выделению.
+   *
+   * clauseId ожидается в attrs узла (например, установлен расширением нумерации пунктов договора).
+   * Используется внешним приложением (Deal) для связи редактора с AI и списком рисков.
+   *
+   * @returns {string | null} Строковый идентификатор пункта или null, если он не задан.
+   */
+  getSelectionClauseId: () => {
+    if (!editor.value) {
+      return null
+    }
+    const node = getSelectionNode(editor.value)
+    const clauseId = node?.attrs?.clauseId
+    return typeof clauseId === 'string' && clauseId.length > 0
+      ? (clauseId as string)
+      : null
+  },
+  /**
+   * Прокручивает документ и переносит фокус к абзацу/заголовку с указанным clauseId.
+   *
+   * Используется для навигации из внешнего UI (например, списка рисков или замечаний)
+   * к соответствующему пункту договора в тексте редактора.
+   *
+   * @param {string} clauseId Стабильный идентификатор пункта (из attrs.clauseId).
+   * @returns {boolean} true, если узел найден и фокус успешно установлен, иначе false.
+   */
+  navigateToBlock(clauseId: string) {
+    if (!editor.value || !clauseId) {
+      return false
+    }
+    let targetPos: number | null = null
+    editor.value.state.doc.descendants((node, pos) => {
+      if (
+        (node.type.name === 'paragraph' || node.type.name === 'heading') &&
+        node.attrs?.clauseId === clauseId
+      ) {
+        targetPos = pos
+        return false
+      }
+      return true
+    })
+    if (targetPos === null) {
+      return false
+    }
+    editor.value
+      .chain()
+      .setTextSelection(targetPos)
+      .focus('start', { scrollIntoView: true })
+      .run()
+    return true
+  },
   deleteSelectionNode: () =>
     editor.value?.commands.deleteSelectionNode() as boolean | undefined,
   setCurrentNodeSelection: () =>

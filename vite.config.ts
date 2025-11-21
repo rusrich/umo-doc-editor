@@ -58,11 +58,15 @@ const buildConfig = {
         format: 'es' as const,
       },
     ],
+    // Важно: бандлим @tiptap/* внутрь пакета, чтобы не зависеть от версии
+    // Tiptap во внешнем приложении (apps/web использует Tiptap 3, а Umo — 2).
+    // Vue по-прежнему остаётся внешней зависимостью.
     external: [
       'vue',
-      ...Object.keys(pkg.dependencies ?? {}),
+      ...Object.keys(pkg.dependencies ?? {}).filter(
+        (dep) => !dep.startsWith('@tiptap/'),
+      ),
       /^@vueuse\/.*/,
-      /^@tiptap\/.*/,
       /^nzh\/.*/,
     ],
     onwarn(warning: any, warn: (warning: any) => void) {

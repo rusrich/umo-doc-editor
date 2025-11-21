@@ -269,6 +269,25 @@
     "toggleHeaderRow": "Header Row",
     "toggleHeaderColumn": "Header Column"
   },
+  "assistant": {
+    "text": "AI Assistant",
+    "placeholder": "Describe how you want to edit the selected text...",
+    "send": "Send",
+    "commands": "Quick commands",
+    "result": "Result",
+    "copy": "Copy",
+    "rewrite": "Rewrite",
+    "delete": "Clear",
+    "exit": "Close assistant",
+    "copySuccess": "Copied",
+    "error": {
+      "title": "Assistant error",
+      "message": "An error occurred while processing your request.",
+      "confirm": "OK"
+    },
+    "addBlock": "AI: Add block",
+    "editBlock": "AI: Edit block"
+  },
   "tools": {
     "barcode": {
       "text": "Barcode",
@@ -576,6 +595,8 @@
     "copySuccess": "Result copied to clipboard",
     "rewrite": "Rewrite",
     "delete": "Delete Result",
+    "addBlock": "AI: Add block",
+    "editBlock": "AI: Edit block",
     "error": {
       "title": "Error Message",
       "message": "An error occurred with the AI Document Assistant result. Please try again!",

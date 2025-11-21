@@ -187,8 +187,13 @@ const ojbectSchema = new ObjectSchema({
   locale: {
     merge: 'replace',
     validate(value) {
-      if (value && !['en-US', 'zh-CN'].includes(value)) {
-        throw new Error('Key "locale": must be one of "zh-CN" or "en-US".')
+      const allowed = ['en-US', 'zh-CN', 'ru-RU', 'kk-KZ']
+      if (value && !allowed.includes(value)) {
+        throw new Error(
+          `Key "locale": must be one of ${allowed
+            .map((v) => `"${v}"`)
+            .join(', ')}.`,
+        )
       }
     },
     required: false,
@@ -725,6 +730,20 @@ const ojbectSchema = new ObjectSchema({
             required: false,
           },
         },
+      },
+      onCommand: {
+        merge: 'replace',
+        validate(value: any) {
+          if (value == null) return
+          if (typeof value !== 'function') {
+            // eslint-disable-next-line no-console
+            console.warn?.(
+              'Key "ai": Key "onCommand" should be a function.',
+              value,
+            )
+          }
+        },
+        required: false,
       },
     },
   },

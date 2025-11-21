@@ -96,6 +96,31 @@ export function getSelectionText(editor: Editor) {
   return editor.state.doc.textBetween(from, to, '')
 }
 
+/**
+ * Возвращает HTML текущего выделения, используя DOM Range ProseMirror.
+ * Используется только для построения AI‑payloadов, поэтому допускает
+ * приблизительную разметку и в случае ошибки возвращает пустую строку.
+ */
+export function getSelectionHtml(editor: Editor): string {
+  const { from, to, empty } = editor.state.selection
+  if (empty) {
+    return ''
+  }
+  try {
+    const view = editor.view
+    const domRange = document.createRange()
+    const start = view.domAtPos(from)
+    const end = view.domAtPos(to)
+    domRange.setStart(start.node, start.offset)
+    domRange.setEnd(end.node, end.offset)
+    const wrapper = document.createElement('div')
+    wrapper.appendChild(domRange.cloneContents())
+    return wrapper.innerHTML
+  } catch {
+    return ''
+  }
+}
+
 // 设置选中区域 包含选中效果
 export function setSelectionText(
   editor: Editor,

@@ -269,6 +269,25 @@
     "toggleHeaderRow": "切换表头行",
     "toggleHeaderColumn": "切换表头列"
   },
+  "assistant": {
+    "text": "AI 助手",
+    "placeholder": "描述你希望如何修改选中的内容...",
+    "send": "发送",
+    "commands": "快捷命令",
+    "result": "结果",
+    "copy": "复制",
+    "rewrite": "重试",
+    "delete": "清空",
+    "exit": "关闭助手",
+    "copySuccess": "已复制",
+    "error": {
+      "title": "助手出错",
+      "message": "处理请求时发生错误。",
+      "confirm": "确定"
+    },
+    "addBlock": "AI：添加当前块",
+    "editBlock": "AI：修改当前块"
+  },
   "tools": {
     "barcode": {
       "text": "条形码",
@@ -576,6 +595,8 @@
     "copySuccess": "复制成功",
     "rewrite": "重写",
     "delete": "删除结果",
+    "addBlock": "AI：添加当前块",
+    "editBlock": "AI：修改当前块",
     "error": {
       "title": "错误提示",
       "message": "AI 文档助手生成结果出现错误，请重试！",

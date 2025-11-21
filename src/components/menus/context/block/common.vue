@@ -175,7 +175,11 @@ let menuActive = $ref(false)
 const popupProps = {
   attach: `${container} .umo-main-container`,
   onVisibleChange(visible: boolean) {
-    editor.value.commands.focus()
+    // При открытии меню не трогаем фокус, чтобы не вызывать лишний скролл.
+    // Возвращаем фокус только при закрытии.
+    if (!visible) {
+      editor.value?.commands.focus()
+    }
     blockMenu.value = visible
     menuActive = visible
     emits('dropdownVisible', visible)

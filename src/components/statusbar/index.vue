@@ -517,6 +517,8 @@ watch(
 const langs = [
   { content: '🇨🇳 简体中文', value: 'zh-CN' },
   { content: '🇱🇷 English', value: 'en-US' },
+  { content: '🇷🇺 Русский', value: 'ru-RU' },
+  { content: '🇰🇿 Қазақша', value: 'kk-KZ' },
 ]
 const setLocale = inject('setLocale') as (value: SupportedLocale) => void
 
@@ -525,7 +527,7 @@ const lang = computed(
 )
 const changeLang = (dropdownItem: DropdownOption) => {
   const value = dropdownItem.value as SupportedLocale
-  if (lang.value === value) {
+  if (locale.value === value) {
     return
   }
   const dialog = useConfirm({

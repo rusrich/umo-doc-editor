@@ -2,6 +2,7 @@ import 'virtual:svg-icons-register'
 
 import type { UmoEditorOptions } from '@/types'
 
+import { createDealEditorOptions, dealBaseOptions, dealEditorOptions } from '@/deal-options'
 import UmoEditor from './index.vue'
 import UmoMenuButton from './menus/button.vue'
 import UmoDialog from './modal.vue'
@@ -21,4 +22,8 @@ export {
   UmoMenuButton,
   UmoTooltip,
   useUmoEditor,
+  // Deal‑пресет и фабрика для применения в приложении
+  dealBaseOptions,
+  dealEditorOptions,
+  createDealEditorOptions,
 }

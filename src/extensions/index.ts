@@ -46,6 +46,7 @@ import { BlockImage, InlineImage } from './image'
 import Indent from './indent'
 import LineHeight from './line-height'
 import Link from './link'
+import ClauseId from './clause-id'
 import Margin from './margin'
 import Mention from './mention'
 import getUsersSuggestion from './mention/suggestion'
@@ -167,6 +168,7 @@ export const getDefaultExtensions = ({
     Indent,
     TextAlign,
     NodeAlign,
+    ClauseId,
     SearchReplace.configure({
       searchResultClass: 'umo-search-result',
     }),

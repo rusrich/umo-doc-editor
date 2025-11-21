@@ -1,8 +1,8 @@
 import type { Extension, HTMLContent, JSONContent } from '@tiptap/core'
 import type { FocusPosition } from '@tiptap/core'
 import { Fragment, Node as ProseMirrorNode } from '@tiptap/pm/model'
-
-export type SupportedLocale = 'en-US' | 'zh-CN'
+import type { App, DefineComponent } from 'vue'
+export type SupportedLocale = 'en-US' | 'zh-CN' | 'ru-RU' | 'kk-KZ'
 export type LayoutOption = 'web' | 'page'
 export interface MarginOption {
   left: number
@@ -198,6 +198,22 @@ export interface AssistantResult {
   command?: string
 }
 
+/**
+ * Унифицированный payload для AI-команд из Umo во внешнее приложение.
+ */
+export interface AiCommandPayload {
+  /** Тип действия: add-to-selection | edit | risk | explain | ... */
+  type: string
+  /** Текст выделенного фрагмента без разметки. */
+  text: string
+  /** HTML-фрагмент выделения (опционально). */
+  html?: string
+  /** Стабильный идентификатор блока (clauseId / data-clause-id), если есть. */
+  clauseId?: string
+  /** Диапазон selection в документе (позиции ProseMirror). */
+  range?: { from: number; to: number }
+}
+
 export interface FileOptions {
   allowedMimeTypes?: string[]
   maxSize?: number
@@ -250,7 +266,13 @@ export interface UmoEditorOptions {
   page?: PageOption
   document?: DocumentOptions
   ai?: {
+    /** Встроенный ассистент Umo (панель внизу). */
     assistant?: AssistantOptions
+    /**
+     * Хук для внешнего приложения: любые AI-команды из UI Umo
+     * (bubble‑menu, блок‑меню, встроенный ассистент и т.п.).
+     */
+    onCommand?: (payload: AiCommandPayload) => void | Promise<void>
   }
   echarts?: EchartsOptions
   webPages?: WebPageItem[]
@@ -270,5 +292,67 @@ export interface UmoEditorOptions {
   onFileDelete?: (id: string, url: string, type?: DeleteFileType) => void
 }
 
-// 组件类型声明
-export * from './src/components'
+/**
+ * Deal‑специфичный пресет настроек редактора.
+ *
+ * Основан на стандартных defaultOptions Umo и включает постраничный режим,
+ * урезанный тулбар и отключённые экзотические инструменты.
+ */
+export declare const dealBaseOptions: Partial<UmoEditorOptions>
+
+/**
+ * Готовые настройки Deal‑редактора для использования "как есть".
+ */
+export declare const dealEditorOptions: UmoEditorOptions
+
+/**
+ * Фабрика для получения настроек Deal‑редактора с возможностью оверрайда.
+ */
+export declare function createDealEditorOptions(
+  overrides?: Partial<UmoEditorOptions>,
+): UmoEditorOptions
+
+/**
+ * Основной Vue‑компонент редактора Umo.
+ */
+export declare const UmoEditor: DefineComponent<
+  Record<string, unknown>,
+  Record<string, unknown>,
+  any
+>
+
+/**
+ * Диалоговое окно Umo (модальные окна редактора).
+ */
+export declare const UmoDialog: DefineComponent<
+  Record<string, unknown>,
+  Record<string, unknown>,
+  any
+>
+
+/**
+ * Кнопка для тулбаров/меню Umo.
+ */
+export declare const UmoMenuButton: DefineComponent<
+  Record<string, unknown>,
+  Record<string, unknown>,
+  any
+>
+
+/**
+ * Тултип Umo, используемый во внутренних контролах.
+ */
+export declare const UmoTooltip: DefineComponent<
+  Record<string, unknown>,
+  Record<string, unknown>,
+  any
+>
+
+/**
+ * Плагин для глобальной регистрации Umo Editor в приложении Vue.
+ */
+export declare const useUmoEditor: {
+  install(app: App, options?: Partial<UmoEditorOptions>): void
+}
+
+export default UmoEditor

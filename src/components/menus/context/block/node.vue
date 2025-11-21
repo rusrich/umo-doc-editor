@@ -29,6 +29,32 @@
           @menu-click="openAssistant"
         />
       </t-dropdown-item>
+      <t-dropdown-item
+        v-if="
+          options.ai?.onCommand &&
+          (editor?.isActive('paragraph') || editor?.isActive('heading'))
+        "
+      >
+        <menus-button
+          ico="assistant"
+:text="t('assistant.addBlock')"
+          :tooltip="false"
+          @menu-click="sendAiAddBlock"
+        />
+      </t-dropdown-item>
+      <t-dropdown-item
+        v-if="
+          options.ai?.onCommand &&
+          (editor?.isActive('paragraph') || editor?.isActive('heading'))
+        "
+      >
+        <menus-button
+          ico="assistant"
+:text="t('assistant.editBlock')"
+          :tooltip="false"
+          @menu-click="sendAiEditBlock"
+        />
+      </t-dropdown-item>
       <t-dropdown-item class="umo-block-menu-group-name" disabled>
         {{ t('blockMenu.insert') }}
       </t-dropdown-item>
@@ -131,6 +157,7 @@
 
 <script setup lang="ts">
 import type { Template } from '@/types'
+import { getSelectionHtml, getSelectionNode, getSelectionText } from '@/extensions/selection'
 
 const emits = defineEmits<{
   dropdownVisible: (visible: boolean) => void
@@ -146,7 +173,11 @@ let menuActive = $ref(false)
 const popupProps = {
   attach: `${container} .umo-main-container`,
   onVisibleChange(visible: boolean) {
-    editor.value.commands.focus()
+    // При открытии меню не трогаем фокус, чтобы не вызывать лишний скролл.
+    // Возвращаем фокус только при закрытии.
+    if (!visible) {
+      editor.value?.commands.focus()
+    }
     blockMenu.value = visible
     menuActive = visible
     emits('dropdownVisible', visible)
@@ -163,6 +194,48 @@ const openAssistant = () => {
   editor.value?.commands.focus()
   const { from, to } = editor.value?.state.selection ?? {}
   editor.value?.commands.setTextSelection({ from: from ?? 0, to: to ?? 0 })
+}
+
+const sendAiAddBlock = async () => {
+  const onCommand = options.value.ai?.onCommand
+  if (!onCommand || !editor.value) {
+    return
+  }
+  const ed = editor.value
+  const node = getSelectionNode(ed)
+  const text = getSelectionText(ed) ?? ''
+  const html = getSelectionHtml(ed) || undefined
+  const clauseId = (node?.attrs?.clauseId as string | null) ?? null
+  const { from, to } = ed.state.selection
+
+  await onCommand({
+    type: 'add-to-selection',
+    text,
+    html,
+    clauseId: clauseId ?? undefined,
+    range: { from, to },
+  })
+}
+
+const sendAiEditBlock = async () => {
+  const onCommand = options.value.ai?.onCommand
+  if (!onCommand || !editor.value) {
+    return
+  }
+  const ed = editor.value
+  const node = getSelectionNode(ed)
+  const text = getSelectionText(ed) ?? ''
+  const html = getSelectionHtml(ed) || undefined
+  const clauseId = (node?.attrs?.clauseId as string | null) ?? null
+  const { from, to } = ed.state.selection
+
+  await onCommand({
+    type: 'edit',
+    text,
+    html,
+    clauseId: clauseId ?? undefined,
+    range: { from, to },
+  })
 }
 
 const setTemplate = ({ content }: Template) => {
