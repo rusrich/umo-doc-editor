@@ -190,7 +190,7 @@ export const getDefaultExtensions = ({
 
     // 其他
     Selection,
-    NodeRange,
+    // NodeRange временно отключён, чтобы не мешать нативному выделению текста и не перехватывать drag
     TableOfContents.configure({
       getIndex: getHierarchicalIndexes,
       scrollParent: () =>
