@@ -52,18 +52,46 @@ const showAiButton = computed(() => {
   return !!selectedNode
 })
 
+/**
+ * Главная AI-кнопка слева от блока (рядом с плюсиком/шестью точками).
+ *
+ * Использует hovered-блок DragHandle (selectedNode/selectedNodePos), но
+ * если пользователь явно выделил текст внутри блока, приоритет отдаётся этому
+ * выделению — в payload уходит только выделенный фрагмент и его диапазон.
+ *
+ * Это гарантирует, что поле "Выбранный фрагмент" в Deal совпадает с тем,
+ * что реально подсвечено в редакторе, а при отсутствии выделения работает
+ * привычный сценарий "правка всего блока".
+ */
 const sendAiEditBlock = async () => {
   const onCommand = options.value.ai?.onCommand
   if (!onCommand || !editor.value || !selectedNode) {
     return
   }
+
   const ed = editor.value
   const node: any = selectedNode
   const pos = selectedNodePos ?? ed.state.selection.from
-  const text = (node?.textContent ?? '').toString()
+  const { from: selFrom, to: selTo, empty } = ed.state.selection
+
+  let text: string
+  let from = selFrom
+  let to = selTo
+
+  if (!empty) {
+    // Если пользователь явно выделил фрагмент текста внутри блока,
+    // отправляем в AI только этот фрагмент, чтобы "Выбранный фрагмент"
+    // совпадал с визуальным выделением.
+    text = (getSelectionText(ed) ?? '').toString()
+  } else {
+    // Если выделения нет — работаем на уровне всего блока (hovered‑блок).
+    text = (node?.textContent ?? '').toString()
+    const baseFrom = pos ?? ed.state.selection.from
+    from = baseFrom
+    to = node ? baseFrom + node.nodeSize : ed.state.selection.to
+  }
+
   const clauseId = (node?.attrs?.clauseId as string | null) ?? null
-  const from = pos ?? ed.state.selection.from
-  const to = node ? from + node.nodeSize : ed.state.selection.to
 
   await onCommand({
     type: 'edit',
@@ -277,6 +305,36 @@ const dropdownVisible = (visible: boolean) => {
   * {
     caret-color: transparent;
   }
+}
+
+// Ограничиваем область, в которой DragHandle перехватывает события мыши:
+//
+// - сама обёртка drag-handle делает слой над блоком;
+// - pointer-events: none на ней позволяет кликам по левому padding абзаца
+//   проходить "сквозь" к тексту/родительскому контейнеру (нативное выделение);
+// - pointer-events: auto возвращаем только для самой панели с иконками,
+//   чтобы dnd блока по-прежнему работал через "шесть точек" и соседние кнопки.
+.umo-block-menu-drag-handle {
+  pointer-events: none;
+
+  .umo-block-menu-hander,
+  .umo-block-menu-hander * {
+    pointer-events: auto;
+  }
+}
+
+// Лёгкая анимация появления AI-кнопки слева от блока:
+// по умолчанию она чуть смещена и прозрачна, при hover drag-handle —
+// плавно проявляется и сдвигается на место.
+.umo-block-menu-drag-handle .umo-ai-menu-button.around-button {
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+}
+
+.umo-block-menu-drag-handle:hover .umo-ai-menu-button.around-button {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .around-button {

@@ -135,18 +135,45 @@ const openAssistant = () => {
   editor.value?.commands.setTextSelection({ from: from ?? 0, to: to ?? 0 })
 }
 
+/**
+ * Отправляет в ai.onCommand команду `add-to-selection` для текущего контекста блока.
+ *
+ * Приоритет:
+ * 1) если есть явное текстовое выделение внутри блока — в payload уходит только выделенный фрагмент
+ *    и его диапазон (selFrom..selTo);
+ * 2) если выделения нет — используем hovered-блок DragHandle (activeBlockNode/activeBlockPos)
+ *    и берём весь текст узла с диапазоном nodePos..nodePos+nodeSize.
+ *
+ * Таким образом, правая AI-панель Deal получает ровно тот текст, который видит пользователь,
+ * а не всегда полный абзац.
+ */
 const sendAiAddBlock = async () => {
   const onCommand = options.value.ai?.onCommand
   if (!onCommand || !editor.value) {
     return
   }
+
   const ed = editor.value
   const node: any = activeBlockNode?.value ?? getSelectionNode(ed)
   const pos: number | null = activeBlockPos?.value ?? ed.state.selection.from
-  const text = (node?.textContent ?? getSelectionText(ed) ?? '').toString()
+  const { from: selFrom, to: selTo, empty } = ed.state.selection
+
+  let text: string
+  let from = selFrom
+  let to = selTo
+
+  if (!empty) {
+    // Явное текстовое выделение: добавляем к общей выборке только этот фрагмент.
+    text = (getSelectionText(ed) ?? '').toString()
+  } else {
+    // Без выделения: добавляем целый hovered‑блок.
+    text = (node?.textContent ?? getSelectionText(ed) ?? '').toString()
+    const baseFrom = pos ?? ed.state.selection.from
+    from = baseFrom
+    to = node ? baseFrom + node.nodeSize : ed.state.selection.to
+  }
+
   const clauseId = (node?.attrs?.clauseId as string | null) ?? null
-  const from = pos ?? ed.state.selection.from
-  const to = node ? from + node.nodeSize : ed.state.selection.to
 
   await onCommand({
     type: 'add-to-selection',
@@ -156,18 +183,43 @@ const sendAiAddBlock = async () => {
   })
 }
 
+/**
+ * Отправляет в ai.onCommand команду `edit` для текущего блока или выделения.
+ *
+ * Логика идентична sendAiAddBlock:
+ * - при непустом selection редактируем только выделенный фрагмент текста;
+ * - без selection редактируем весь hovered-блок (узел под DragHandle).
+ *
+ * Дополнительно прикладываем clauseId и точный диапазон range, чтобы
+ * EditorUmo мог сохранить контекст для последующего применения результата AI.
+ */
 const sendAiEditBlock = async () => {
   const onCommand = options.value.ai?.onCommand
   if (!onCommand || !editor.value) {
     return
   }
+
   const ed = editor.value
   const node: any = activeBlockNode?.value ?? getSelectionNode(ed)
   const pos: number | null = activeBlockPos?.value ?? ed.state.selection.from
-  const text = (node?.textContent ?? getSelectionText(ed) ?? '').toString()
+  const { from: selFrom, to: selTo, empty } = ed.state.selection
+
+  let text: string
+  let from = selFrom
+  let to = selTo
+
+  if (!empty) {
+    // Есть выделение внутри блока — редактируем только этот фрагмент.
+    text = (getSelectionText(ed) ?? '').toString()
+  } else {
+    // Нет выделения — редактируем весь hovered‑блок.
+    text = (node?.textContent ?? getSelectionText(ed) ?? '').toString()
+    const baseFrom = pos ?? ed.state.selection.from
+    from = baseFrom
+    to = node ? baseFrom + node.nodeSize : ed.state.selection.to
+  }
+
   const clauseId = (node?.attrs?.clauseId as string | null) ?? null
-  const from = pos ?? ed.state.selection.from
-  const to = node ? from + node.nodeSize : ed.state.selection.to
 
   await onCommand({
     type: 'edit',
