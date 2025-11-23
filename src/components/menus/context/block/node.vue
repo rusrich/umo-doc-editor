@@ -16,8 +16,13 @@
         <menus-button ico="assistant" :text="t('assistant.addBlock')" :tooltip="false" @menu-click="sendAiAddBlock" />
       </t-dropdown-item>
       <t-dropdown-item v-if="options.ai?.onCommand">
-        <menus-button class="umo-ai-menu-button" ico="assistant" :text="t('assistant.editBlock')" :tooltip="false"
-          @menu-click="sendAiEditBlock" />
+        <menus-button
+          class="umo-ai-menu-button"
+          ico="assistant"
+          :text="t('assistant.editBlock')"
+          :tooltip="false"
+          @menu-click="onAiMenuClick"
+        />
       </t-dropdown-item>
       <t-dropdown-item class="umo-block-menu-group-name" disabled>
         {{ t('blockMenu.insert') }}
@@ -107,16 +112,15 @@ const options = inject('options')
 // Hovered-блок, проброшенный из DragHandle (block/index.vue)
 const activeBlockNode = inject('activeBlockNode') as any
 const activeBlockPos = inject('activeBlockPos') as any
+// Управление общим inline-tooltip, размещённым на главной AI-кнопке в block/index.vue
+const openAiInlineTooltip = inject<((initialInstruction?: string) => void) | null>('openAiInlineTooltip', null)
 
 let menuActive = $ref(false)
 const popupProps = {
   attach: `${container} .umo-main-container`,
   onVisibleChange(visible: boolean) {
-    // При открытии меню не трогаем фокус, чтобы не вызывать лишний скролл.
-    // Возвращаем фокус только при закрытии.
-    if (!visible) {
-      editor.value?.commands.focus()
-    }
+    // Не трогаем фокус редактора при открытии/закрытии меню, чтобы
+    // избежать автоскролла (особенно при сценариях AI).
     blockMenu.value = visible
     menuActive = visible
     emits('dropdownVisible', visible)
@@ -183,50 +187,12 @@ const sendAiAddBlock = async () => {
   })
 }
 
-/**
- * Отправляет в ai.onCommand команду `edit` для текущего блока или выделения.
- *
- * Логика идентична sendAiAddBlock:
- * - при непустом selection редактируем только выделенный фрагмент текста;
- * - без selection редактируем весь hovered-блок (узел под DragHandle).
- *
- * Дополнительно прикладываем clauseId и точный диапазон range, чтобы
- * EditorUmo мог сохранить контекст для последующего применения результата AI.
- */
-const sendAiEditBlock = async () => {
-  const onCommand = options.value.ai?.onCommand
-  if (!onCommand || !editor.value) {
-    return
+const onAiMenuClick = () => {
+  // Открываем общий inline-tooltip на главной AI-кнопке и закрываем дропдаун.
+  if (openAiInlineTooltip) {
+    openAiInlineTooltip()
   }
-
-  const ed = editor.value
-  const node: any = activeBlockNode?.value ?? getSelectionNode(ed)
-  const pos: number | null = activeBlockPos?.value ?? ed.state.selection.from
-  const { from: selFrom, to: selTo, empty } = ed.state.selection
-
-  let text: string
-  let from = selFrom
-  let to = selTo
-
-  if (!empty) {
-    // Есть выделение внутри блока — редактируем только этот фрагмент.
-    text = (getSelectionText(ed) ?? '').toString()
-  } else {
-    // Нет выделения — редактируем весь hovered‑блок.
-    text = (node?.textContent ?? getSelectionText(ed) ?? '').toString()
-    const baseFrom = pos ?? ed.state.selection.from
-    from = baseFrom
-    to = node ? baseFrom + node.nodeSize : ed.state.selection.to
-  }
-
-  const clauseId = (node?.attrs?.clauseId as string | null) ?? null
-
-  await onCommand({
-    type: 'edit',
-    text,
-    clauseId: clauseId ?? undefined,
-    range: { from, to },
-  })
+  emits('dropdownVisible', false)
 }
 
 const setTemplate = ({ content }: Template) => {
@@ -238,7 +204,8 @@ const setTemplate = ({ content }: Template) => {
 </script>
 
 <style lang="less">
-.umo-ai-menu-button.umo-menu-button {
+.umo-ai-menu-button.umo-menu-button,
+.umo-block-menu .umo-ai-menu-button.umo-menu-button {
   position: relative;
   overflow: hidden;
   color: #fff;
@@ -259,8 +226,11 @@ const setTemplate = ({ content }: Template) => {
       font-weight: 500;
     }
 
-    .umo-button-icon {
-      color: #fff;
+    .umo-button-icon,
+    :deep(.umo-icon) {
+      color: #fff !important;
+      fill: #fff !important;
+      stroke: #fff !important;
     }
   }
 
@@ -297,5 +267,20 @@ const setTemplate = ({ content }: Template) => {
   100% {
     transform: translateX(240%) rotate(20deg);
   }
+}
+
+.umo-ai-inline-tooltip {
+  padding: 8px 10px;
+  min-width: 220px;
+  max-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.umo-ai-inline-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
 }
 </style>

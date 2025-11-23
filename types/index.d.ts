@@ -212,6 +212,8 @@ export interface AiCommandPayload {
   clauseId?: string
   /** Диапазон selection в документе (позиции ProseMirror). */
   range?: { from: number; to: number }
+  /** Текст инструкции для ИИ (опционально, пробрасывается во внешнее приложение). */
+  instruction?: string
 }
 
 export interface FileOptions {

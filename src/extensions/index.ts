@@ -48,6 +48,7 @@ import LineHeight from './line-height'
 import Link from './link'
 import ClauseId from './clause-id'
 import Margin from './margin'
+import AiSelection from './ai-selection'
 import Mention from './mention'
 import getUsersSuggestion from './mention/suggestion'
 import NodeAlign from './node-align'
@@ -190,6 +191,7 @@ export const getDefaultExtensions = ({
 
     // 其他
     Selection,
+    AiSelection,
     // NodeRange временно отключён, чтобы не мешать нативному выделению текста и не перехватывать drag
     TableOfContents.configure({
       getIndex: getHierarchicalIndexes,

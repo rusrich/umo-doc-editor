@@ -8,8 +8,80 @@
         editor.isActive('table') ||
         editor.isActive('callout')
       " :node="selectedNode" :pos="selectedNodePos" @dropdown-visible="dropdownVisible" />
-      <menus-button v-if="showAiButton" class="umo-ai-menu-button around-button" ico="assistant" hide-text
-        :tooltip="t('assistant.editBlock')" @menu-click="sendAiEditBlock" />
+      <t-popup
+        v-if="showAiButton"
+        v-model="aiInlineVisible"
+        placement="right-top"
+        trigger="click"
+        :attach="container"
+      >
+        <t-tooltip :content="t('assistant.editBlock')" placement="top">
+          <t-button
+            class="umo-ai-menu-button around-button"
+            variant="text"
+            size="small"
+          >
+            <svg
+              class="umo-ai-icon"
+              width="16"
+              height="16"
+              viewBox="0 0 48 48"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M24 44C35.0457 44 44 35.0457 44 24C44 12.9543 35.0457 4 24 4C12.9543 4 4 12.9543 4 24C4 35.0457 12.9543 44 24 44Z"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M24 28V24"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M24 20H24.01"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </t-button>
+        </t-tooltip>
+        <template #content>
+          <div class="umo-ai-inline-tooltip">
+            <t-textarea
+              v-model="aiInstruction"
+              size="small"
+              :placeholder="t('assistant.placeholder')"
+              autosize
+            />
+            <div class="umo-ai-inline-actions">
+              <t-button
+                size="small"
+                variant="text"
+                theme="default"
+                @click="onAiInlineCancel"
+              >
+                {{ t('assistant.exit') }}
+              </t-button>
+              <t-button
+                size="small"
+                theme="primary"
+                :disabled="!aiInstruction.trim()"
+                @click="onAiInlineApply"
+              >
+                {{ t('assistant.send') }}
+              </t-button>
+            </div>
+          </div>
+        </template>
+      </t-popup>
     </div>
   </drag-handle>
 </template>
@@ -22,12 +94,23 @@ import { getSelectionHtml, getSelectionNode, getSelectionText } from '@/extensio
 
 const editor = inject('editor')
 const options = inject('options')
+const container = inject('container')
 let selectedNode = $ref<any | null>(null)
 let selectedNodePos = $ref<number | null>(null)
+
+let aiInlineVisible = $ref(false)
+let aiInstruction = $ref('')
 
 // Делаем hovered-блок доступным во вложенных меню (плюс-меню и т.п.)
 provide('activeBlockNode', computed(() => selectedNode))
 provide('activeBlockPos', computed(() => selectedNodePos))
+// Даём plus-меню доступ к управлению тем же inline-tooltip
+provide('openAiInlineTooltip', (initialInstruction?: string) => {
+  if (typeof initialInstruction === 'string') {
+    aiInstruction = initialInstruction
+  }
+  aiInlineVisible = true
+})
 
 let tippyInstance = $ref<Instance | null>(null)
 const tippyOpitons = $ref<Partial<Instance>>({
@@ -53,19 +136,15 @@ const showAiButton = computed(() => {
 })
 
 /**
- * Главная AI-кнопка слева от блока (рядом с плюсиком/шестью точками).
- *
- * Использует hovered-блок DragHandle (selectedNode/selectedNodePos), но
- * если пользователь явно выделил текст внутри блока, приоритет отдаётся этому
- * выделению — в payload уходит только выделенный фрагмент и его диапазон.
- *
- * Это гарантирует, что поле "Выбранный фрагмент" в Deal совпадает с тем,
- * что реально подсвечено в редакторе, а при отсутствии выделения работает
- * привычный сценарий "правка всего блока".
+ * Применяет inline‑AI‑правку для текущего блока или выделения.
+ * Использует hovered-блок DragHandle (selectedNode/selectedNodePos) и
+ * текущее текстовое выделение, добавляя instruction из поля tooltip.
  */
-const sendAiEditBlock = async () => {
+const applyInlineAiEdit = async () => {
   const onCommand = options.value.ai?.onCommand
   if (!onCommand || !editor.value || !selectedNode) {
+    aiInlineVisible = false
+    aiInstruction = ''
     return
   }
 
@@ -98,7 +177,23 @@ const sendAiEditBlock = async () => {
     text,
     clauseId: clauseId ?? undefined,
     range: { from, to },
+    instruction:
+      aiInstruction && aiInstruction.trim().length > 0
+        ? aiInstruction.trim()
+        : undefined,
   })
+
+  aiInlineVisible = false
+  aiInstruction = ''
+}
+
+const onAiInlineCancel = () => {
+  aiInlineVisible = false
+  aiInstruction = ''
+}
+
+const onAiInlineApply = async () => {
+  await applyInlineAiEdit()
 }
 
 // 菜单位置更新
@@ -323,24 +418,66 @@ const dropdownVisible = (visible: boolean) => {
   }
 }
 
-// Лёгкая анимация появления AI-кнопки слева от блока:
-// по умолчанию она чуть смещена и прозрачна, при hover drag-handle —
-// плавно проявляется и сдвигается на место.
-.umo-block-menu-drag-handle .umo-ai-menu-button.around-button {
-  opacity: 0;
-  transform: translateY(4px);
-  transition: opacity 0.15s ease-out, transform 0.15s ease-out;
-}
-
-.umo-block-menu-drag-handle:hover .umo-ai-menu-button.around-button {
-  opacity: 1;
-  transform: translateY(0);
-}
-
 .around-button {
   border-bottom-left-radius: 50%;
   border-bottom-right-radius: 50%;
   border-top-left-radius: 0;
   border-top-right-radius: 50%;
+}
+
+// Стили для AI-кнопки слева от блока
+.umo-ai-menu-button.around-button {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    135deg,
+    #466bff,
+    #ff58c7,
+    #915dff
+  );
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.12),
+    0 6px 14px rgba(0, 0, 0, 0.25);
+
+  .umo-ai-icon {
+    display: block;
+    color: #fff;
+    fill: none;
+    stroke: currentColor;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -40%;
+    width: 60%;
+    height: 200%;
+    background: linear-gradient(120deg,
+        rgba(255, 255, 255, 0.1),
+        rgba(255, 255, 255, 0.65),
+        rgba(255, 255, 255, 0.1));
+    transform: translateX(-120%) rotate(20deg);
+    pointer-events: none;
+    animation: umo-ai-button-shine 2.4s ease-in-out infinite;
+  }
+
+  &:hover {
+    filter: brightness(1.05);
+  }
+}
+
+@keyframes umo-ai-button-shine {
+  0% {
+    transform: translateX(-120%) rotate(20deg);
+  }
+
+  60% {
+    transform: translateX(140%) rotate(20deg);
+  }
+
+  100% {
+    transform: translateX(240%) rotate(20deg);
+  }
 }
 </style>
