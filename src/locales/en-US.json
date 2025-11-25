@@ -597,6 +597,9 @@
     "delete": "Delete Result",
     "addBlock": "AI: Add block",
     "editBlock": "AI: Edit block",
+    "riskDocument": "AI: Analyze document risks",
+    "riskBlock": "AI: Analyze block risks",
+    "replaceRequisites": "AI: Replace requisites",
     "error": {
       "title": "Error Message",
       "message": "An error occurred with the AI Document Assistant result. Please try again!",

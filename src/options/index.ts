@@ -661,6 +661,7 @@ const ojbectSchema = new ObjectSchema({
       },
     },
   },
+  // AI-опции редактора (ассистент, общий onCommand-хук, режим активации блокового меню).
   ai: {
     merge: 'replace',
     validate: 'object',
@@ -740,6 +741,18 @@ const ojbectSchema = new ObjectSchema({
             console.warn?.(
               'Key "ai": Key "onCommand" should be a function.',
               value,
+            )
+          }
+        },
+        required: false,
+      },
+      blockActivationMode: {
+        merge: 'replace',
+        validate(value: any) {
+          if (value == null) return
+          if (value !== 'hover' && value !== 'click') {
+            throw new Error(
+              'Key "ai": Key "blockActivationMode" must be one of "hover" or "click".',
             )
           }
         },

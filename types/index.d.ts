@@ -275,6 +275,12 @@ export interface UmoEditorOptions {
      * (bubble‑menu, блок‑меню, встроенный ассистент и т.п.).
      */
     onCommand?: (payload: AiCommandPayload) => void | Promise<void>
+    /**
+     * Режим активации AI-кнопок у блока:
+     * - 'hover' — по наведению (текущее поведение по умолчанию);
+     * - 'click' — только по явному клику по DragHandle/панели блока.
+     */
+    blockActivationMode?: 'hover' | 'click'
   }
   echarts?: EchartsOptions
   webPages?: WebPageItem[]

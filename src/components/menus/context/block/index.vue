@@ -1,50 +1,19 @@
 <template>
   <drag-handle :editor="editor" :tippy-options="tippyOpitons" class="umo-block-menu-drag-handle"
     :class="{ 'is-empty': editor.isEmpty }" @node-change="nodeChange">
-    <div class="umo-block-menu-hander" :class="`umo-selected-node-${selectedNode?.type?.name || 'unknown'} `">
+    <div v-if="activationMode === 'click' ? showBlockMenuClick : true" class="umo-block-menu-hander"
+      :class="`umo-selected-node-${selectedNode?.type?.name || 'unknown'} `">
       <menus-context-block-node @dropdown-visible="dropdownVisible" />
       <menus-context-block-common v-if="
         !editor.isEmpty ||
         editor.isActive('table') ||
         editor.isActive('callout')
       " :node="selectedNode" :pos="selectedNodePos" @dropdown-visible="dropdownVisible" />
-      <t-dropdown v-if="showAiButton" placement="bottom-right" overlay-class-name="umo-ai-menu-dropdown" trigger="click" :destroy-on-close="false">
+      <t-dropdown v-if="showAiButton" placement="bottom-right" overlay-class-name="umo-ai-menu-dropdown" trigger="click"
+        :destroy-on-close="false">
         <t-tooltip content="AI" placement="top">
-          <t-button
-            class="umo-ai-menu-button around-button"
-            variant="text"
-            size="small"
-          >
-            <svg
-              class="umo-ai-icon"
-              width="16"
-              height="16"
-              viewBox="0 0 48 48"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M24 44C35.0457 44 44 35.0457 44 24C44 12.9543 35.0457 4 24 4C12.9543 4 4 12.9543 4 24C4 35.0457 12.9543 44 24 44Z"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-              <path
-                d="M24 28V24"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-              <path
-                d="M24 20H24.01"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
+          <t-button class="umo-ai-menu-button around-button aspect-square" variant="text" size="small">
+            AI
           </t-button>
         </t-tooltip>
         <t-dropdown-menu>
@@ -54,27 +23,22 @@
           <t-dropdown-item @click="sendAiAddBlock">
             <menus-button ico="assistant" :text="t('assistant.addBlock')" :tooltip="false" />
           </t-dropdown-item>
+          <t-dropdown-item @click="sendRiskBlock">
+            <menus-button ico="assistant" :text="t('assistant.riskBlock')" :tooltip="false" />
+          </t-dropdown-item>
+          <t-dropdown-item @click="sendRiskDocument">
+            <menus-button ico="assistant" :text="t('assistant.riskDocument')" :tooltip="false" />
+          </t-dropdown-item>
+          <t-dropdown-item @click="sendReplaceRequisites">
+            <menus-button ico="assistant" :text="t('assistant.replaceRequisites')" :tooltip="false" />
+          </t-dropdown-item>
         </t-dropdown-menu>
       </t-dropdown>
-      <t-dialog
-        v-model:visible="aiInlineVisible"
-        header="Редактирование с помощью ИИ"
-        :footer="false"
-        width="480px"
-        :attach="container"
-        @close="onAiInlineCancel"
-      >
-        <ai-tooltip
-          v-model:instruction="aiInstruction"
-          v-model:mode="applyModeLocal"
-          :loading="aiIsLoading"
-          :has-pending="!!aiPendingResult"
-          :pending-result="aiPendingResult"
-          @send="onAiInlineSend"
-          @cancel="onAiInlineCancel"
-          @accept="onAiInlineAccept"
-          @reject="onAiInlineReject"
-        />
+      <t-dialog v-model:visible="aiInlineVisible" header="Редактирование с помощью ИИ" :footer="false" width="480px"
+        :attach="container" @close="onAiInlineCancel">
+        <ai-tooltip v-model:instruction="aiInstruction" v-model:mode="applyModeLocal" :loading="aiIsLoading"
+          :has-pending="!!aiPendingResult" :pending-result="aiPendingResult" @send="onAiInlineSend"
+          @cancel="onAiInlineCancel" @accept="onAiInlineAccept" @reject="onAiInlineReject" />
       </t-dialog>
     </div>
   </drag-handle>
@@ -97,6 +61,9 @@ const unregisterAiResultReady = inject<any>('clearAiResultReady', null)
 
 let selectedNode = $ref<any | null>(null)
 let selectedNodePos = $ref<number | null>(null)
+
+// Флаг для click-режима активации AI-кнопки у блока
+let aiHandlePinned = $ref(false)
 
 let aiInlineVisible = $ref(false)
 let aiInstruction = $ref('')
@@ -211,7 +178,95 @@ const sendAiAddBlock = async () => {
   })
 }
 
+// Анализ рисков по текущему блоку
+const sendRiskBlock = async () => {
+  const onCommand = options.value.ai?.onCommand
+  if (!onCommand || !editor.value || !selectedNode) {
+    return
+  }
+
+  const ed = editor.value
+  const node: any = selectedNode
+  const pos = selectedNodePos ?? ed.state.selection.from
+
+  const baseFrom = pos ?? ed.state.selection.from
+  const from = baseFrom
+  const to = node ? baseFrom + node.nodeSize : ed.state.selection.to
+
+  const text = (node?.textContent ?? '').toString()
+  const clauseId = (node?.attrs?.clauseId as string | null) ?? null
+
+  await onCommand({
+    type: 'risk-block',
+    text,
+    clauseId: clauseId ?? undefined,
+    range: { from, to },
+  })
+}
+
+// Анализ рисков по всему документу
+const sendRiskDocument = async () => {
+  const onCommand = options.value.ai?.onCommand
+  const ed = editor.value
+  if (!onCommand || !ed) {
+    return
+  }
+
+  let text = ''
+  let html: string | undefined
+  try {
+    text = typeof ed.getText === 'function' ? ed.getText() : ''
+  } catch {
+    text = ''
+  }
+  try {
+    html = typeof ed.getHTML === 'function' ? ed.getHTML() : undefined
+  } catch {
+    html = undefined
+  }
+
+  await onCommand({
+    type: 'risk-document',
+    text,
+    html,
+  })
+}
+
+// Замена реквизитов в документе
+const sendReplaceRequisites = async () => {
+  const onCommand = options.value.ai?.onCommand
+  const ed = editor.value
+  if (!onCommand || !ed) {
+    return
+  }
+
+  let text = ''
+  try {
+    text = typeof ed.getText === 'function' ? ed.getText() : ''
+  } catch {
+    text = ''
+  }
+
+  await onCommand({
+    type: 'replace-requisites',
+    text,
+  })
+}
+
+const activationMode = computed(
+  () => options.value.ai?.blockActivationMode ?? 'hover',
+)
+
 let tippyInstance = $ref<Instance | null>(null)
+
+// В click-режиме управляет видимостью панели bubble (плюсик, шесть точек, AI).
+// В hover-режиме панель ведёт себя как раньше (ограничение по режиму не применяется).
+const showBlockMenuClick = computed(() => {
+  if (!editor?.value) return false
+  if (!selectedNode) return false
+  return aiHandlePinned
+})
+
 const tippyOpitons = $ref<Partial<Instance>>({
   zIndex: 20,
   popperOptions: {
@@ -230,8 +285,11 @@ const tippyOpitons = $ref<Partial<Instance>>({
 const showAiButton = computed(() => {
   if (!editor?.value || !options?.value) return false
   if (!options.value.ai?.onCommand) return false
-  // Показываем AI-кнопку для любого выбранного блока, если есть обработчик ai.onCommand
-  return !!selectedNode
+  if (!selectedNode) return false
+  // В hover-режиме показываем AI-кнопку при наведении на блок.
+  if (activationMode.value === 'hover') return true
+  // В click-режиме AI-кнопка показывается только после явного клика по панели блока.
+  return aiHandlePinned
 })
 
 /**
@@ -406,15 +464,147 @@ const updateMenuPostion = useThrottleFn(() => {
   } catch { }
 }, 200)
 
+let editorClickCleanup: null | (() => void) = null
+
 onMounted(() => {
-  editor.value.on('selectionUpdate', updateMenuPostion)
+  const handleSelectionUpdate = () => {
+    // Всегда обновляем позицию bubble-меню
+    updateMenuPostion()
+
+    const ed = editor.value
+    if (!ed) return
+
+    // В hover-режиме дополнительно ничего не делаем, полагаемся на поведение DragHandle по hover.
+    if (activationMode.value !== 'click') {
+      // На всякий случай снимаем "замок" drag-handle, если выходим из click-режима.
+      if (ed.commands?.setMeta) {
+        ed.commands.setMeta('lockDragHandle', false as any)
+      }
+      return
+    }
+
+    const { selection } = ed.state
+    const $pos = selection.$from
+
+    let depth = $pos.depth
+    let node = $pos.node(depth)
+
+    // Поднимаемся до ближайшего блочного узла (параграф, заголовок и т.п.)
+    while (depth > 0 && !node.isBlock) {
+      depth -= 1
+      node = $pos.node(depth)
+    }
+
+    if (!node || !node.isBlock) {
+      // Вышли из текста блока — сбрасываем pin и выбранный блок
+      aiHandlePinned = false
+      selectedNode = null
+      selectedNodePos = null
+      if (ed.commands?.setMeta) {
+        ed.commands.setMeta('lockDragHandle', false as any)
+      }
+      return
+    }
+
+    const nodePos = $pos.before(depth)
+    selectedNode = node
+    selectedNodePos = nodePos
+    aiHandlePinned = true
+
+    // Лочим drag-handle на выбранном блоке, чтобы hover по другим блокам не уводил bubble.
+    if (ed.commands?.setMeta) {
+      ed.commands.setMeta('lockDragHandle', true as any)
+    }
+
+    syncAiHighlights()
+  }
+
+  editor.value.on('selectionUpdate', handleSelectionUpdate)
+
+  // DOM-click по тексту блока: фиксируем выбранный блок и pin в обоих режимах.
+  const ed = editor.value
+  const view = ed?.view
+  const dom = view?.dom as HTMLElement | undefined
+  if (dom && view) {
+    const handleEditorClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null
+      if (!target) return
+
+      // Игнорируем клики по самим контролам DragHandle и AI-меню
+      if (
+        target.closest('.umo-block-menu-hander') ||
+        target.closest('.umo-ai-menu-dropdown') ||
+        target.closest('.umo-block-menu-dropdown')
+      ) {
+        return
+      }
+
+      try {
+        const coords = { left: event.clientX, top: event.clientY }
+        const pos = view.posAtCoords(coords)
+        if (!pos) return
+
+        const $pos = view.state.doc.resolve(pos.pos)
+        let depth = $pos.depth
+        let node = $pos.node(depth)
+
+        // Поднимаемся до ближайшего блочного узла (параграф, заголовок и т.п.)
+        while (depth > 0 && !node.isBlock) {
+          depth -= 1
+          node = $pos.node(depth)
+        }
+
+        if (!node || !node.isBlock) {
+          // Клик вне блочного контента: сбрасываем pin и разблокируем drag-handle
+          aiHandlePinned = false
+          selectedNode = null
+          selectedNodePos = null
+          if (ed.commands?.setMeta) {
+            ed.commands.setMeta('lockDragHandle', false as any)
+          }
+          return
+        }
+
+        const nodePos = $pos.before(depth)
+        selectedNode = node
+        selectedNodePos = nodePos
+        aiHandlePinned = true
+
+        // Лочим drag-handle на выбранном блоке, чтобы hover по другим блокам не уводил bubble в click-режиме.
+        if (ed.commands?.setMeta) {
+          ed.commands.setMeta('lockDragHandle', true as any)
+        }
+
+        syncAiHighlights()
+      } catch {
+        // fail-safe
+      }
+    }
+
+    dom.addEventListener('click', handleEditorClick)
+    editorClickCleanup = () => {
+      dom.removeEventListener('click', handleEditorClick)
+    }
+  }
+})
+
+onBeforeUnmount(() => {
+  if (editorClickCleanup) {
+    editorClickCleanup()
+  }
 })
 
 const nodeChange = ({ node, pos }: { node: Node | null; pos: number }) => {
-  selectedNode = node ?? null
-  if (pos !== null) {
-    selectedNodePos = pos
+  // В hover-режиме обновляем selectedNode/selectedNodePos как обычно.
+  // В click-режиме НЕ сбрасываем aiHandlePinned при простом наведении —
+  // сброс pin должен происходить только при явном клике по другому блоку (через selectionUpdate).
+  if (activationMode.value === 'hover') {
+    selectedNode = node ?? null
+    if (pos !== null) {
+      selectedNodePos = pos
+    }
   }
+  // В click-режиме сохраняем текущий выбранный блок и pin, пока не кликнем по другому блоку.
 }
 
 const dropdownVisible = (visible: boolean) => {
@@ -615,18 +805,18 @@ const dropdownVisible = (visible: boolean) => {
   border-bottom-right-radius: 50%;
   border-top-left-radius: 0;
   border-top-right-radius: 50%;
+  border: none;
 }
 
 // Стили для AI-кнопки слева от блока
 .umo-ai-menu-button.around-button {
+  color: #fff;
+  font-weight: 900;
   position: relative;
   overflow: hidden;
-  background: linear-gradient(
-    135deg,
-    #466bff,
-    #ff58c7,
-    #915dff
-  );
+  background: linear-gradient(135deg,
+      #ff58c7,
+      #915dff);
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.12),
     0 6px 14px rgba(0, 0, 0, 0.25);
@@ -635,7 +825,7 @@ const dropdownVisible = (visible: boolean) => {
     display: block;
     color: #fff;
     fill: none;
-    stroke: currentColor;
+    stroke: none;
   }
 
   &::after {
