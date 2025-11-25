@@ -79,8 +79,13 @@ export default Extension.create({
               }
             }
 
+            // При любых изменениях документа аккуратно маппим существующие декорации
+            // через стандартный API prosemirror-view: DecorationSet.map(mapping, doc).
+            // Ранее здесь было deco.map(tr.doc, tr.mapping), что приводило к
+            // ошибке "Cannot read properties of undefined (reading 'length')" при
+            // доступе к mapping.maps внутри DecorationSet.map.
             if (tr.docChanged) {
-              deco = deco.map(tr.doc, tr.mapping)
+              deco = deco.map(tr.mapping, tr.doc)
             }
             return deco
           },

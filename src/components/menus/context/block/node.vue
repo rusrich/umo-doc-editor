@@ -3,27 +3,6 @@
     :destroy-on-close="false" :popup-props="popupProps">
     <menus-button class="umo-block-menu-button" :menu-active="menuActive" ico="block-add" hide-text />
     <t-dropdown-menu>
-      <t-dropdown-item
-        v-if="
-          options.ai?.assistant?.enabled &&
-          editor?.state?.selection?.$from?.nodeAfter
-        "
-        divider
-      >
-        <menus-button ico="assistant" :text="t('assistant.text')" :tooltip="false" @menu-click="openAssistant" />
-      </t-dropdown-item>
-      <t-dropdown-item v-if="options.ai?.onCommand">
-        <menus-button ico="assistant" :text="t('assistant.addBlock')" :tooltip="false" @menu-click="sendAiAddBlock" />
-      </t-dropdown-item>
-      <t-dropdown-item v-if="options.ai?.onCommand">
-        <menus-button
-          class="umo-ai-menu-button"
-          ico="assistant"
-          :text="t('assistant.editBlock')"
-          :tooltip="false"
-          @menu-click="onAiMenuClick"
-        />
-      </t-dropdown-item>
       <t-dropdown-item class="umo-block-menu-group-name" disabled>
         {{ t('blockMenu.insert') }}
       </t-dropdown-item>

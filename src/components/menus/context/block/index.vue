@@ -8,14 +8,8 @@
         editor.isActive('table') ||
         editor.isActive('callout')
       " :node="selectedNode" :pos="selectedNodePos" @dropdown-visible="dropdownVisible" />
-      <t-popup
-        v-if="showAiButton"
-        v-model="aiInlineVisible"
-        placement="right-top"
-        trigger="click"
-        :attach="container"
-      >
-        <t-tooltip :content="t('assistant.editBlock')" placement="top">
+      <t-dropdown v-if="showAiButton" placement="bottom-right" overlay-class-name="umo-ai-menu-dropdown" trigger="click" :destroy-on-close="false">
+        <t-tooltip content="AI" placement="top">
           <t-button
             class="umo-ai-menu-button around-button"
             variant="text"
@@ -53,35 +47,35 @@
             </svg>
           </t-button>
         </t-tooltip>
-        <template #content>
-          <div class="umo-ai-inline-tooltip">
-            <t-textarea
-              v-model="aiInstruction"
-              size="small"
-              :placeholder="t('assistant.placeholder')"
-              autosize
-            />
-            <div class="umo-ai-inline-actions">
-              <t-button
-                size="small"
-                variant="text"
-                theme="default"
-                @click="onAiInlineCancel"
-              >
-                {{ t('assistant.exit') }}
-              </t-button>
-              <t-button
-                size="small"
-                theme="primary"
-                :disabled="!aiInstruction.trim()"
-                @click="onAiInlineApply"
-              >
-                {{ t('assistant.send') }}
-              </t-button>
-            </div>
-          </div>
-        </template>
-      </t-popup>
+        <t-dropdown-menu>
+          <t-dropdown-item @click="openAiModal">
+            <menus-button ico="assistant" :text="t('assistant.editBlock')" :tooltip="false" />
+          </t-dropdown-item>
+          <t-dropdown-item @click="sendAiAddBlock">
+            <menus-button ico="assistant" :text="t('assistant.addBlock')" :tooltip="false" />
+          </t-dropdown-item>
+        </t-dropdown-menu>
+      </t-dropdown>
+      <t-dialog
+        v-model:visible="aiInlineVisible"
+        header="Редактирование с помощью ИИ"
+        :footer="false"
+        width="480px"
+        :attach="container"
+        @close="onAiInlineCancel"
+      >
+        <ai-tooltip
+          v-model:instruction="aiInstruction"
+          v-model:mode="applyModeLocal"
+          :loading="aiIsLoading"
+          :has-pending="!!aiPendingResult"
+          :pending-result="aiPendingResult"
+          @send="onAiInlineSend"
+          @cancel="onAiInlineCancel"
+          @accept="onAiInlineAccept"
+          @reject="onAiInlineReject"
+        />
+      </t-dialog>
     </div>
   </drag-handle>
 </template>
@@ -89,28 +83,133 @@
 <script setup lang="ts">
 import DragHandle from '@tiptap-pro/extension-drag-handle-vue-3'
 import type { Instance } from 'tippy.js'
+import type { Node } from '@tiptap/pm/model'
 
 import { getSelectionHtml, getSelectionNode, getSelectionText } from '@/extensions/selection'
+import AiTooltip from './ai-tooltip.vue'
 
 const editor = inject('editor')
 const options = inject('options')
 const container = inject('container')
+const assistant = inject('assistant')
+const registerAiResultReady = inject<any>('onAiResultReady', null)
+const unregisterAiResultReady = inject<any>('clearAiResultReady', null)
+
 let selectedNode = $ref<any | null>(null)
 let selectedNodePos = $ref<number | null>(null)
 
 let aiInlineVisible = $ref(false)
 let aiInstruction = $ref('')
+let aiPendingResult = $ref<{ beforeText: string; afterText: string } | null>(null)
+let aiIsLoading = $ref(false)
+let applyModeLocal = $ref<'replace' | 'insert-after' | 'insert-below'>('replace')
+let lastSelectionRange = $ref<{ from: number; to: number } | null>(null)
+
+// Регистрируем callback для получения AI-результата из EditorUmo
+if (typeof registerAiResultReady === 'function') {
+  registerAiResultReady((result: { from: number; to: number; beforeText: string; afterText: string }) => {
+    aiPendingResult = { beforeText: result.beforeText, afterText: result.afterText }
+    lastSelectionRange = { from: result.from, to: result.to }
+    aiIsLoading = false
+  })
+}
 
 // Делаем hovered-блок доступным во вложенных меню (плюс-меню и т.п.)
 provide('activeBlockNode', computed(() => selectedNode))
 provide('activeBlockPos', computed(() => selectedNodePos))
-// Даём plus-меню доступ к управлению тем же inline-tooltip
+// Открытие модального окна AI
+const openAiModal = () => {
+  aiInlineVisible = true
+  aiPendingResult = null
+  aiIsLoading = false
+  aiInstruction = ''
+  // Добавляем текущий блок к существующей множественной выборке (если есть)
+  const onCommand = options.value.ai?.onCommand
+  if (onCommand && editor.value && selectedNode) {
+    const ed = editor.value
+    const node: any = selectedNode
+    const pos = selectedNodePos ?? ed.state.selection.from
+    const { from: selFrom, to: selTo, empty } = ed.state.selection
+
+    let text: string
+    let from = selFrom
+    let to = selTo
+
+    if (!empty) {
+      text = (getSelectionText(ed) ?? '').toString()
+    } else {
+      text = (node?.textContent ?? '').toString()
+      const baseFrom = pos ?? ed.state.selection.from
+      from = baseFrom
+      to = node ? baseFrom + node.nodeSize : ed.state.selection.to
+    }
+
+    const clauseId = (node?.attrs?.clauseId as string | null) ?? null
+
+    // Отправляем команду с типом 'edit', но без сброса существующей выборки
+    onCommand({
+      type: 'edit',
+      text,
+      clauseId: clauseId ?? undefined,
+      range: { from, to },
+      preserveSelection: true, // Новый флаг
+    })
+  }
+}
+
+// Даём plus-меню доступ к управлению тем же модальным окном
 provide('openAiInlineTooltip', (initialInstruction?: string) => {
   if (typeof initialInstruction === 'string') {
     aiInstruction = initialInstruction
   }
-  aiInlineVisible = true
+  openAiModal()
 })
+
+// Открытие ассистента
+const openAssistant = () => {
+  if (assistant) {
+    assistant.value = true
+  }
+  editor.value?.commands.selectParentNode()
+  editor.value?.commands.focus()
+  const { from, to } = editor.value?.state.selection ?? {}
+  editor.value?.commands.setTextSelection({ from: from ?? 0, to: to ?? 0 })
+}
+
+// Добавление блока в AI-выборку
+const sendAiAddBlock = async () => {
+  const onCommand = options.value.ai?.onCommand
+  if (!onCommand || !editor.value || !selectedNode) {
+    return
+  }
+
+  const ed = editor.value
+  const node: any = selectedNode
+  const pos = selectedNodePos ?? ed.state.selection.from
+  const { from: selFrom, to: selTo, empty } = ed.state.selection
+
+  let text: string
+  let from = selFrom
+  let to = selTo
+
+  if (!empty) {
+    text = (getSelectionText(ed) ?? '').toString()
+  } else {
+    text = (node?.textContent ?? '').toString()
+    const baseFrom = pos ?? ed.state.selection.from
+    from = baseFrom
+    to = node ? baseFrom + node.nodeSize : ed.state.selection.to
+  }
+
+  const clauseId = (node?.attrs?.clauseId as string | null) ?? null
+
+  await onCommand({
+    type: 'add-to-selection',
+    text,
+    clauseId: clauseId ?? undefined,
+    range: { from, to },
+  })
+}
 
 let tippyInstance = $ref<Instance | null>(null)
 const tippyOpitons = $ref<Partial<Instance>>({
@@ -134,6 +233,23 @@ const showAiButton = computed(() => {
   // Показываем AI-кнопку для любого выбранного блока, если есть обработчик ai.onCommand
   return !!selectedNode
 })
+
+/**
+ * Синхронизирует подсветку выбранного блока/текста в редакторе через ai-selection.
+ */
+const syncAiHighlights = () => {
+  if (!editor?.value || !selectedNode) return
+  const ed = editor.value
+  const { from: selFrom, to: selTo, empty } = ed.state.selection
+  const pos = selectedNodePos ?? ed.state.selection.from
+  const range = empty
+    ? { from: pos, to: (selectedNode ? pos + selectedNode.nodeSize : ed.state.selection.to) }
+    : { from: selFrom, to: selTo }
+  // Вызываем команду setAiSelections для подсветки
+  if (ed.commands?.setAiSelections) {
+    ed.commands.setAiSelections([range])
+  }
+}
 
 /**
  * Применяет inline‑AI‑правку для текущего блока или выделения.
@@ -172,6 +288,9 @@ const applyInlineAiEdit = async () => {
 
   const clauseId = (node?.attrs?.clauseId as string | null) ?? null
 
+  // Сохраняем диапазон для последующего применения результата
+  lastSelectionRange = { from, to }
+
   await onCommand({
     type: 'edit',
     text,
@@ -183,17 +302,90 @@ const applyInlineAiEdit = async () => {
         : undefined,
   })
 
-  aiInlineVisible = false
-  aiInstruction = ''
+  // НЕ закрываем tooltip, чтобы пользователь увидел результат
+  // aiInlineVisible = false
+  // aiInstruction = ''
 }
 
 const onAiInlineCancel = () => {
+  // Явно закрываем tooltip через v-model
   aiInlineVisible = false
   aiInstruction = ''
+  aiPendingResult = null
+  aiIsLoading = false
+  lastSelectionRange = null
+  // Очищаем diff-подсветку
+  if (editor.value?.commands?.clearAiDiff) {
+    editor.value.commands.clearAiDiff()
+  }
+  // Убираем подсветку
+  if (editor.value?.commands?.setAiSelections) {
+    editor.value.commands.setAiSelections([])
+  }
 }
 
-const onAiInlineApply = async () => {
-  await applyInlineAiEdit()
+const onAiInlineSend = async () => {
+  if (!aiInstruction.trim()) return
+  aiIsLoading = true
+  try {
+    // Отправляем команду в EditorUmo для обработки AI
+    await applyInlineAiEdit()
+    // Закрываем модальное окно после отправки
+    aiInlineVisible = false
+    aiIsLoading = false
+  } catch {
+    aiIsLoading = false
+  }
+}
+
+const onAiInlineAccept = () => {
+  if (!aiPendingResult) return
+  // Применяем AI-результат к редактору через insertContentAt
+  const range = lastSelectionRange || (
+    selectedNodePos !== null && selectedNode
+      ? { from: selectedNodePos, to: selectedNodePos + selectedNode.nodeSize }
+      : null
+  )
+  if (range && editor.value?.commands?.insertContentAt) {
+    const mode = applyModeLocal
+    const cleaned = aiPendingResult.afterText
+    if (mode === 'replace') {
+      editor.value.commands.insertContentAt({ from: range.from, to: range.to }, cleaned)
+    } else if (mode === 'insert-after') {
+      editor.value.commands.insertContentAt(range.to, ` ${cleaned}`)
+    } else if (mode === 'insert-below') {
+      editor.value.commands.insertContentAt(range.to, `\n${cleaned}\n`)
+    }
+  } else if (aiPendingResult.afterText && editor.value?.commands?.insertContent) {
+    editor.value.commands.insertContent(aiPendingResult.afterText)
+  }
+
+  // Очищаем diff-подсветку
+  if (editor.value?.commands?.clearAiDiff) {
+    editor.value.commands.clearAiDiff()
+  }
+
+  // Закрываем tooltip
+  aiInlineVisible = false
+  aiInstruction = ''
+  aiPendingResult = null
+  aiIsLoading = false
+  lastSelectionRange = null
+  if (editor.value?.commands?.setAiSelections) {
+    editor.value.commands.setAiSelections([])
+  }
+}
+
+const onAiInlineReject = () => {
+  // Очищаем diff и результат, но оставляем tooltip открытым для новой попытки
+  aiPendingResult = null
+  aiIsLoading = false
+  // Очищаем diff-подсветку
+  if (editor.value?.commands?.clearAiDiff) {
+    editor.value.commands.clearAiDiff()
+  }
+  // Восстанавливаем обычную подсветку выделения
+  syncAiHighlights()
 }
 
 // 菜单位置更新

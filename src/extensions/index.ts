@@ -49,6 +49,7 @@ import Link from './link'
 import ClauseId from './clause-id'
 import Margin from './margin'
 import AiSelection from './ai-selection'
+import AiDiff from './ai-diff'
 import Mention from './mention'
 import getUsersSuggestion from './mention/suggestion'
 import NodeAlign from './node-align'
@@ -189,9 +190,10 @@ export const getDefaultExtensions = ({
     // 页面
     PageBreak,
 
-    // 其他
+    // Другие
     Selection,
     AiSelection,
+    AiDiff,
     // NodeRange временно отключён, чтобы не мешать нативному выделению текста и не перехватывать drag
     TableOfContents.configure({
       getIndex: getHierarchicalIndexes,
