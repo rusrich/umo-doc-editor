@@ -257,6 +257,46 @@ const activationMode = computed(
   () => options.value.ai?.blockActivationMode ?? 'hover',
 )
 
+// Aggregated risk badges from host app (by clauseId)
+const riskBadges = computed<Record<string, any>>(
+  () => (options?.value?.ai?.risks ?? {}) as Record<string, any>,
+)
+
+const currentClauseId = computed<string | null>(() => {
+  const node: any = selectedNode
+  const id = node?.attrs?.clauseId
+  return typeof id === 'string' && id.length > 0 ? id : null
+})
+
+const currentRiskBadge = computed<any | null>(() => {
+  const id = currentClauseId.value
+  if (!id) return null
+  const badge = riskBadges.value[id] ?? null
+  // eslint-disable-next-line no-console
+  console.log('[umo][risk-icon] currentClauseId', id, 'badge', badge)
+  return badge
+})
+
+const handleRiskIconClick = () => {
+  const onCommand = options.value.ai?.onCommand
+  if (!onCommand || !editor.value || !selectedNode || !currentRiskBadge.value) return
+
+  const ed = editor.value
+  const node: any = selectedNode
+  const pos = selectedNodePos ?? ed.state.selection.from
+  const from = pos
+  const to = node ? pos + node.nodeSize : ed.state.selection.to
+  const text = (node?.textContent ?? '').toString()
+
+  void onCommand({
+    type: 'risk-focus',
+    text,
+    clauseId: currentRiskBadge.value.clauseId ?? currentClauseId.value ?? undefined,
+    range: { from, to },
+    riskId: currentRiskBadge.value.primaryRiskId,
+  })
+}
+
 let tippyInstance = $ref<Instance | null>(null)
 
 // В click-режиме управляет видимостью панели bubble (плюсик, шесть точек, AI).
@@ -862,4 +902,5 @@ const dropdownVisible = (visible: boolean) => {
     transform: translateX(240%) rotate(20deg);
   }
 }
+
 </style>

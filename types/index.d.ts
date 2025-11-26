@@ -202,7 +202,7 @@ export interface AssistantResult {
  * Унифицированный payload для AI-команд из Umo во внешнее приложение.
  */
 export interface AiCommandPayload {
-  /** Тип действия: add-to-selection | edit | risk | explain | ... */
+  /** Тип действия: add-to-selection | edit | risk-block | risk-document | risk-focus | ... */
   type: string
   /** Текст выделенного фрагмента без разметки. */
   text: string
@@ -214,6 +214,8 @@ export interface AiCommandPayload {
   range?: { from: number; to: number }
   /** Текст инструкции для ИИ (опционально, пробрасывается во внешнее приложение). */
   instruction?: string
+  /** Идентификатор конкретного риска (используется для фокуса по клику на иконку риска). */
+  riskId?: string
 }
 
 export interface FileOptions {
@@ -281,6 +283,25 @@ export interface UmoEditorOptions {
      * - 'click' — только по явному клику по DragHandle/панели блока.
      */
     blockActivationMode?: 'hover' | 'click'
+    /**
+     * Агрегированная информация о рисках по пунктам договора.
+     * Ключ — clauseId, значение — краткое описание для inline‑индикации в Umo.
+     *
+     * Umo использует только минимальный набор полей (severity, hasMultiple, title),
+     * не загружая полные тексты рисков внутрь редактора.
+     */
+    risks?: Record<
+      string,
+      {
+        clauseId: string
+        severity: 'low' | 'medium' | 'high'
+        hasMultiple: boolean
+        /** Общее количество рисков по этому пункту. */
+        count?: number
+        primaryRiskId?: string
+        title?: string
+      }
+    >
   }
   echarts?: EchartsOptions
   webPages?: WebPageItem[]

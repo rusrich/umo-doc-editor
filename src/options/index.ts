@@ -758,6 +758,19 @@ const ojbectSchema = new ObjectSchema({
         },
         required: false,
       },
+      risks: {
+        merge: 'replace',
+        // Минимальная валидация: ожидаем простой объект-словарь { [clauseId]: {...} }.
+        // Структуру значений намеренно не проверяем жёстко, чтобы не ломать host-приложение
+        // при эволюции контракта AiRiskItem на стороне Deal.
+        validate(value: unknown) {
+          if (value == null) return
+          if (!isRecord(value)) {
+            throw new Error('Key "ai": Key "risks" must be a plain object map.')
+          }
+        },
+        required: false,
+      },
     },
   },
   echarts: {
@@ -793,14 +806,19 @@ const ojbectSchema = new ObjectSchema({
         throw new Error('Key "webPages": must be a array.')
       }
       value.forEach((item, index: number) => {
-        if (!item.label || item.label === '') {
-          throw new Error(
-            `Key "webPages[${index}]": Key "label" cannot be empty.`,
+        // Раньше отсутствие label/icon приводило к жёсткой ошибке WrapperError и падению интеграции.
+        // Для встраивания в внешние приложения (Deal) делаем проверку мягкой: только предупреждаем,
+        // но не выбрасываем исключение.
+        if (!item.label || (typeof item.label === 'string' && item.label === '')) {
+          // eslint-disable-next-line no-console
+          console.warn?.(
+            `Key "webPages[${index}]": Key "label" is empty. This item will still be used, but it's recommended to provide a non-empty label.`,
           )
         }
         if (!item.icon || item.icon === '') {
-          throw new Error(
-            `Key "webPages[${index}]": Key "icon" cannot be empty.`,
+          // eslint-disable-next-line no-console
+          console.warn?.(
+            `Key "webPages[${index}]": Key "icon" is empty. This item will still be used, but it's recommended to provide an icon.`,
           )
         }
         if (!item.validate || !isFunction(item.validate)) {
