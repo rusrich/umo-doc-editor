@@ -1,22 +1,13 @@
 <template>
   <div v-if="markers.length" class="umo-risk-layer">
-    <t-tooltip
-      v-for="marker in markers"
-      :key="marker.clauseId"
-      :content="marker.title || getSeverityLabel(marker.severity)"
-      placement="top"
-    >
-      <button
-        type="button"
-        class="umo-risk-layer-chip"
-        :style="{ top: `${marker.top}px` }"
-        @click.stop="handleMarkerClick(marker)"
-      >
-        <span
-          :class="['umo-risk-layer-dot', `sev-${marker.severity}`]"
-        />
+    <t-tooltip v-for="marker in markers" :key="marker.clauseId"
+      :content="marker.title || getSeverityLabel(marker.severity)" placement="top">
+      <button type="button" class="umo-risk-layer-chip" :style="{ top: `${marker.top}px` }"
+        @click.stop="handleMarkerClick(marker)">
+        <span :class="['umo-risk-layer-dot', `sev-${marker.severity}`]" />
         <span class="umo-risk-layer-text">
-          {{ getSeverityLabel(marker.severity) }}<span v-if="marker.count && marker.count > 1"> ×{{ marker.count }}</span>
+          {{ getSeverityLabel(marker.severity) }}<span v-if="marker.count && marker.count > 1"> ×{{ marker.count
+            }}</span>
         </span>
       </button>
     </t-tooltip>
@@ -175,7 +166,7 @@ const handleMarkerClick = (marker: RiskMarker) => {
 
 .umo-risk-layer-chip {
   position: absolute;
-  left: -32px;
+  left: 32px;
   display: inline-flex;
   align-items: center;
   gap: 4px;

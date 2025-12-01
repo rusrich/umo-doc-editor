@@ -2,7 +2,16 @@ import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 
-export type AiSelectionRange = { from: number; to: number }
+export type AiSelectionRange = {
+  from: number
+  to: number
+  /**
+   * Необязательная "семантика" выделения для AI-подсветки.
+   * Используется, например, для рисков (low/medium/high), чтобы
+   * окрасить подсветку в соответствующий цвет.
+   */
+  severity?: 'low' | 'medium' | 'high' | string
+}
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -70,9 +79,17 @@ export default Extension.create({
               }
 
               try {
-                const decorations = safeRanges.map(({ from, to }) =>
-                  Decoration.inline(from, to, { class: 'umo-ai-selection' }),
-                )
+                const decorations = safeRanges.map(({ from, to, severity }) => {
+                  const s = (severity || '').toString().toLowerCase()
+                  const sevClass =
+                    s === 'high' || s === 'medium' || s === 'low'
+                      ? `umo-ai-selection--sev-${s}`
+                      : ''
+                  const className = ['umo-ai-selection', sevClass]
+                    .filter(Boolean)
+                    .join(' ')
+                  return Decoration.inline(from, to, { class: className })
+                })
                 return DecorationSet.create(tr.doc, decorations)
               } catch {
                 return DecorationSet.empty

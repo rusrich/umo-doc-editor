@@ -19,7 +19,6 @@
   />
   <!-- Always-visible risk markers for blocks with risks (document-level layer) -->
   <RiskLayer v-if="options.ai?.risks" />
-  <RiskInline v-if="options.ai?.risks" />
   <template
     v-if="editor && !destroyed && !page.preview?.enabled && editor.isEditable"
   >
@@ -43,7 +42,6 @@ import { contentTransform } from '@/utils/content-transform'
 import { addHistory } from '@/utils/history-record'
 import { loadResource } from '@/utils/load-resource'
 import RiskLayer from '@/components/ai/risk-layer.vue'
-import RiskInline from '@/components/ai/risk-inline.vue'
 
 const destroyed = inject('destroyed')
 const page = inject('page')

@@ -841,11 +841,12 @@ const dropdownVisible = (visible: boolean) => {
 }
 
 .around-button {
-  border-bottom-left-radius: 50%;
-  border-bottom-right-radius: 50%;
-  border-top-left-radius: 0;
-  border-top-right-radius: 50%;
+  border-radius: 0 50% 50%;
   border: none;
+
+  &:focus {
+    border: none;
+  }
 }
 
 // Стили для AI-кнопки слева от блока
@@ -902,5 +903,4 @@ const dropdownVisible = (visible: boolean) => {
     transform: translateX(240%) rotate(20deg);
   }
 }
-
 </style>
