@@ -257,6 +257,30 @@ const activationMode = computed(
   () => options.value.ai?.blockActivationMode ?? 'hover',
 )
 
+// При смене режима активации AI-кнопок (click/hover) сразу синхронизируем
+// внутреннее состояние, чтобы режим "по наведению" начинал работать без
+// перезагрузки страницы и без дополнительных selectionUpdate-событий.
+watch(
+  () => activationMode.value,
+  (mode, prevMode) => {
+    const ed = editor.value
+    if (!ed) return
+    if (mode === 'hover') {
+      // Сбрасываем pin и выбранный блок, разблокируем drag-handle
+      aiHandlePinned = false
+      selectedNode = null
+      selectedNodePos = null
+      try {
+        if ((ed as any).commands?.setMeta) {
+          ;(ed as any).commands.setMeta('lockDragHandle', false as any)
+        }
+      } catch {
+        // best-effort
+      }
+    }
+  },
+)
+
 // Aggregated risk badges from host app (by clauseId)
 const riskBadges = computed<Record<string, any>>(
   () => (options?.value?.ai?.risks ?? {}) as Record<string, any>,
@@ -523,6 +547,29 @@ onMounted(() => {
       return
     }
 
+    // Диагностика: логируем selectionUpdate в click-режиме.
+    try {
+      const sel = ed.state.selection
+      // eslint-disable-next-line no-console
+      console.log('[UmoBlockMenu.selectionUpdate]', {
+        aiHandlePinned,
+        from: sel.from,
+        to: sel.to,
+        empty: sel.empty,
+      })
+    } catch {}
+
+    // В click-режиме не хотим автоматически "прибивать" панель к последнему
+    // блоку только из-за того, что ProseMirror поменял selection (например,
+    // при первой инициализации документа). Это провоцирует автоскролл к
+    // концу документа.
+    //
+    // Поэтому, пока блок явно не закреплён кликом (aiHandlePinned === false),
+    // просто обновляем позицию bubble и выходим.
+    if (!aiHandlePinned) {
+      return
+    }
+
     const { selection } = ed.state
     const $pos = selection.$from
 
@@ -549,7 +596,6 @@ onMounted(() => {
     const nodePos = $pos.before(depth)
     selectedNode = node
     selectedNodePos = nodePos
-    aiHandlePinned = true
 
     // Лочим drag-handle на выбранном блоке, чтобы hover по другим блокам не уводил bubble.
     if (ed.commands?.setMeta) {
@@ -583,6 +629,15 @@ onMounted(() => {
         const coords = { left: event.clientX, top: event.clientY }
         const pos = view.posAtCoords(coords)
         if (!pos) return
+
+        // Диагностика: логируем клик по тексту в обоих режимах.
+        // eslint-disable-next-line no-console
+        console.log('[UmoBlockMenu.editorClick]', {
+          activationMode: activationMode.value,
+          clientX: event.clientX,
+          clientY: event.clientY,
+          pos: pos.pos,
+        })
 
         const $pos = view.state.doc.resolve(pos.pos)
         let depth = $pos.depth

@@ -235,6 +235,39 @@ watch(
 // Lifecycle Hooks
 onMounted(() => {
   setTheme(options.value.theme)
+
+  // DEBUG: логируем все вызовы scrollIntoView внутри контейнера редактора,
+  // чтобы отловить источник неожиданных автоскроллов. Будет удалено после
+  // нахождения корневой причины.
+  try {
+    const w = window as any
+    if (!w.__umoScrollDebugInstalled) {
+      w.__umoScrollDebugInstalled = true
+      const originalScrollIntoView = Element.prototype.scrollIntoView
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      Element.prototype.scrollIntoView = function (...args: any[]) {
+        try {
+          const el = this as HTMLElement
+          const inUmo = !!el.closest('.umo-editor-container')
+          if (inUmo) {
+            // eslint-disable-next-line no-console
+            console.log('[UmoDebug.scrollIntoView]', {
+              tag: el.tagName,
+              id: el.id,
+              className: el.className,
+              args,
+            })
+          }
+        } catch {
+          // ignore logging errors
+        }
+        // @ts-ignore
+        return originalScrollIntoView.apply(this, args as any)
+      }
+    }
+  } catch {
+    // best-effort only
+  }
 })
 onBeforeUnmount(() => {
   clearAutoSaveInterval()
@@ -266,7 +299,6 @@ watch(
   () => getTypewriterRunState(),
   (newValue: boolean) => {
     typeWriterIsRunning.value = newValue
-    console.log('typeWriterIsRunning', typeWriterIsRunning)
   },
 )
 
@@ -732,7 +764,9 @@ const setContent = (
   options: SetContentOptions = {
     emitUpdate: true,
     focusPosition: 'start',
-    focusOptions: { scrollIntoView: true },
+    // По умолчанию НЕ скроллим документ при установке контента,
+    // чтобы избежать неожиданных прыжков (Undo/перезагрузка страницы).
+    focusOptions: { scrollIntoView: false },
   },
 ) => {
   if (!editor.value) {
@@ -752,7 +786,8 @@ const insertContent = (
   options: InsterContentOptions = {
     updateSelection: true,
     focusPosition: 'start',
-    focusOptions: { scrollIntoView: true },
+    // Аналогично setContent — по умолчанию не скроллим.
+    focusOptions: { scrollIntoView: false },
   },
 ) => {
   if (!editor.value) {
@@ -962,7 +997,9 @@ const getVanillaHTML = async () => {
   return htmlContent
 }
 
-const focus = (position = 'start', options = { scrollIntoView: true }) =>
+// Внешний helper для фокуса редактора. По умолчанию не скроллит документ,
+// чтобы не провоцировать неожиданные прыжки (Undo/перезагрузка).
+const focus = (position = 'start', options = { scrollIntoView: false }) =>
   editor.value?.commands.focus(position as FocusPosition, options)
 
 const blur = () => editor.value?.chain().blur().run()
@@ -1160,9 +1197,12 @@ const getContentExcerpt = (charLimit = 100, more = ' ...') => {
 }
 /* 撤销 重做操作*/
 const undoHistory = () => {
-  undoHistoryRecord(historyRecords, function (record) {
+  undoHistoryRecord(historyRecords, (record) => {
     if (record?.type === 'editor') {
-      editor?.value?.chain().focus().undo().run()
+      // Откатим редактор без принудительного автоскролла.
+      // Поведение выравниваем с типичным использованием Tiptap:
+      // просто вызываем undo, без chain().focus().
+      editor.value?.commands.undo()
     } else if (record?.type === 'page' && record?.proType) {
       // 撤销
       if (page?.value && record.oldData !== undefined) {
@@ -1172,9 +1212,11 @@ const undoHistory = () => {
   })
 }
 const redoHistory = () => {
-  redoHistoryRecord(historyRecords, function (record) {
+  redoHistoryRecord(historyRecords, (record) => {
     if (record?.type === 'editor') {
-      editor?.value?.chain().focus().redo().run()
+      // Аналогично undo — повторяем действие без явного focus(),
+      // чтобы не дергать scrollIntoView.
+      editor.value?.commands.redo()
     } else if (record?.type === 'page' && record?.proType) {
       //  恢复
       if (page?.value && record.newData !== undefined) {
@@ -1317,6 +1359,10 @@ defineExpose({
     if (targetPos === null) {
       return false
     }
+    // Диагностика неожиданного скролла: логируем все вызовы navigateToBlock.
+    // Это позволит понять, кто именно инициирует навигацию при refresh.
+    // eslint-disable-next-line no-console
+    console.log('[UmoEditor.navigateToBlock] scroll to clauseId', clauseId, 'pos', targetPos)
     editor.value
       .chain()
       .setTextSelection(targetPos)
@@ -1400,10 +1446,15 @@ defineExpose({
     right: 0;
     bottom: 0;
   }
-  &:not(.umo-editor-is-typerwriterRuning) {
-    pointer-events: none; /* 核心：禁用所有鼠标事件 */
-    /* 可选：添加半透明效果提示不可交互 */
-    opacity: 0.9;
-  }
+  // Ранее здесь глобально отключались pointer-events для всего контейнера,
+  // пока не запущен typewriter. Это делало редактор некликабельным в
+  // ряде сценариев (в том числе при загрузке страницы в режиме click
+  // активации AI-кнопок), ломало hover/click‑обработчики и побочно
+  // приводило к странным автоскроллам.
+  //
+  // Для Deal-редактора это поведение не нужно, поэтому полностью
+  // убираем глобальный pointer-events: none и связанную полупрозрачность.
+  // Контроль доступности/блокировки редактора осуществляется на уровне
+  // readOnly/disabled, а не через CSS‑отключение событий.
 }
 </style>

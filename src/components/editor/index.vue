@@ -66,7 +66,7 @@ const extensions: any[] = getDefaultExtensions({
   uploadFileMap,
 })
 
-const editorInstance: Editor = new Editor({
+  const editorInstance: Editor = new Editor({
   editable: !options.value.document?.readOnly,
   autofocus: options.value.document?.autofocus,
   content: contentTransform(options.value.document?.content),
@@ -76,7 +76,13 @@ const editorInstance: Editor = new Editor({
     attributes: {
       class: 'umo-editor',
     },
-    ...options.value.document?.editorProps,
+    // Глобально выключаем автоматический scrollToSelection при фокусе
+    // (поведение ProseMirror по умолчанию), чтобы избежать рывков
+    // прокрутки при загрузке страницы и восстановлении фокуса.
+    // Прицельный скролл (navigateToBlock и т.п.) по-прежнему
+    // вызывается явно через focus('start', { scrollIntoView: true }).
+    handleScrollToSelectionOnFocus: () => false,
+    ...(options.value.document?.editorProps ?? {}),
   },
   parseOptions: options.value.document?.parseOptions,
   extensions: [...extensions, ...options.value.extensions],
