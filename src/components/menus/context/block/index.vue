@@ -296,8 +296,6 @@ const currentRiskBadge = computed<any | null>(() => {
   const id = currentClauseId.value
   if (!id) return null
   const badge = riskBadges.value[id] ?? null
-  // eslint-disable-next-line no-console
-  console.log('[umo][risk-icon] currentClauseId', id, 'badge', badge)
   return badge
 })
 
@@ -547,18 +545,6 @@ onMounted(() => {
       return
     }
 
-    // Диагностика: логируем selectionUpdate в click-режиме.
-    try {
-      const sel = ed.state.selection
-      // eslint-disable-next-line no-console
-      console.log('[UmoBlockMenu.selectionUpdate]', {
-        aiHandlePinned,
-        from: sel.from,
-        to: sel.to,
-        empty: sel.empty,
-      })
-    } catch {}
-
     // В click-режиме не хотим автоматически "прибивать" панель к последнему
     // блоку только из-за того, что ProseMirror поменял selection (например,
     // при первой инициализации документа). Это провоцирует автоскролл к
@@ -629,15 +615,6 @@ onMounted(() => {
         const coords = { left: event.clientX, top: event.clientY }
         const pos = view.posAtCoords(coords)
         if (!pos) return
-
-        // Диагностика: логируем клик по тексту в обоих режимах.
-        // eslint-disable-next-line no-console
-        console.log('[UmoBlockMenu.editorClick]', {
-          activationMode: activationMode.value,
-          clientX: event.clientX,
-          clientY: event.clientY,
-          pos: pos.pos,
-        })
 
         const $pos = view.state.doc.resolve(pos.pos)
         let depth = $pos.depth

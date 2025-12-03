@@ -235,39 +235,6 @@ watch(
 // Lifecycle Hooks
 onMounted(() => {
   setTheme(options.value.theme)
-
-  // DEBUG: логируем все вызовы scrollIntoView внутри контейнера редактора,
-  // чтобы отловить источник неожиданных автоскроллов. Будет удалено после
-  // нахождения корневой причины.
-  try {
-    const w = window as any
-    if (!w.__umoScrollDebugInstalled) {
-      w.__umoScrollDebugInstalled = true
-      const originalScrollIntoView = Element.prototype.scrollIntoView
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      Element.prototype.scrollIntoView = function (...args: any[]) {
-        try {
-          const el = this as HTMLElement
-          const inUmo = !!el.closest('.umo-editor-container')
-          if (inUmo) {
-            // eslint-disable-next-line no-console
-            console.log('[UmoDebug.scrollIntoView]', {
-              tag: el.tagName,
-              id: el.id,
-              className: el.className,
-              args,
-            })
-          }
-        } catch {
-          // ignore logging errors
-        }
-        // @ts-ignore
-        return originalScrollIntoView.apply(this, args as any)
-      }
-    }
-  } catch {
-    // best-effort only
-  }
 })
 onBeforeUnmount(() => {
   clearAutoSaveInterval()
@@ -1359,10 +1326,6 @@ defineExpose({
     if (targetPos === null) {
       return false
     }
-    // Диагностика неожиданного скролла: логируем все вызовы navigateToBlock.
-    // Это позволит понять, кто именно инициирует навигацию при refresh.
-    // eslint-disable-next-line no-console
-    console.log('[UmoEditor.navigateToBlock] scroll to clauseId', clauseId, 'pos', targetPos)
     editor.value
       .chain()
       .setTextSelection(targetPos)
