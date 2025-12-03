@@ -80,13 +80,42 @@ export default Extension.create({
   },
 })
 export function getSelectionNode(editor: Editor) {
-  // @ts-ignore
-  const { $anchor, node } = editor.state.selection
-  if (node?.type?.isAtom) {
-    return node
+  const selection: any = editor.state.selection
+  const explicitNode = selection.node as any | null
+
+  // Если явно выбрана нода (NodeSelection) — возвращаем её как есть
+  // (изображения, таблицы, виджеты и т.п.).
+  if (explicitNode) {
+    return explicitNode
   }
-  editor.commands.selectParentNode()
-  return $anchor.node(1) || node
+
+  const $anchor = selection.$anchor
+  if (!$anchor) {
+    return null
+  }
+
+  // 1. В первую очередь ищем ближайший paragraph/heading —
+  // именно на них навешивается clauseId и завязан Deal.
+  for (let depth = $anchor.depth; depth > 0; depth--) {
+    const nodeAtDepth = $anchor.node(depth) as any
+    if (
+      nodeAtDepth?.type?.name === 'paragraph' ||
+      nodeAtDepth?.type?.name === 'heading'
+    ) {
+      return nodeAtDepth
+    }
+  }
+
+  // 2. Если подходящего абзаца/заголовка нет, берём ближайший блочный узел
+  // (списки, таблицы, callout и т.п.).
+  for (let depth = $anchor.depth; depth > 0; depth--) {
+    const nodeAtDepth = $anchor.node(depth) as any
+    if (nodeAtDepth?.isBlock) {
+      return nodeAtDepth
+    }
+  }
+
+  return null
 }
 export function getSelectionText(editor: Editor) {
   const { from, to, empty } = editor.state.selection

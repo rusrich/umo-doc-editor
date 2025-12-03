@@ -510,14 +510,19 @@ const onAiInlineReject = () => {
 
 // 菜单位置更新
 const updateMenuPostion = useThrottleFn(() => {
-  if (!tippyInstance) {
+  if (!tippyInstance || !editor?.value) {
     return
   }
   try {
     const { state, view } = editor.value
-    const topPos = state.selection.$from.before(1)
-    const topDOM = view.nodeDOM(topPos)
-    const rect = topDOM?.getBoundingClientRect()
+    const $from: any = state.selection.$from
+
+    // Пытаемся найти "клаузу" (paragraph/heading) под курсором/selection.
+    const found = resolveClauseNodeAtPos($from)
+    const refDepth = found?.depth ?? 1
+    const refPos = $from.before(refDepth)
+    const topDOM = view.nodeDOM(refPos)
+    const rect = (topDOM as HTMLElement | null)?.getBoundingClientRect()
     if (rect) {
       tippyInstance.setProps({
         getReferenceClientRect: () => rect,
@@ -525,6 +530,34 @@ const updateMenuPostion = useThrottleFn(() => {
     }
   } catch { }
 }, 200)
+
+// Находит "клаузу" по позиции: сначала paragraph/heading, затем ближайший блочный узел.
+const resolveClauseNodeAtPos = (
+  $pos: any,
+): { node: Node; depth: number } | null => {
+  if (!$pos) return null
+
+  // 1. Ищем вложенный paragraph/heading (в том числе внутри списков, ячеек таблиц и т.п.).
+  for (let depth = $pos.depth; depth > 0; depth--) {
+    const nodeAtDepth = $pos.node(depth) as Node
+    if (
+      nodeAtDepth?.type?.name === 'paragraph' ||
+      nodeAtDepth?.type?.name === 'heading'
+    ) {
+      return { node: nodeAtDepth, depth }
+    }
+  }
+
+  // 2. Если абзаца/заголовка нет — берём ближайший блочный узел.
+  for (let depth = $pos.depth; depth > 0; depth--) {
+    const nodeAtDepth = $pos.node(depth) as Node
+    if (nodeAtDepth?.isBlock) {
+      return { node: nodeAtDepth, depth }
+    }
+  }
+
+  return null
+}
 
 let editorClickCleanup: null | (() => void) = null
 
@@ -557,18 +590,9 @@ onMounted(() => {
     }
 
     const { selection } = ed.state
-    const $pos = selection.$from
+    const found = resolveClauseNodeAtPos(selection.$from)
 
-    let depth = $pos.depth
-    let node = $pos.node(depth)
-
-    // Поднимаемся до ближайшего блочного узла (параграф, заголовок и т.п.)
-    while (depth > 0 && !node.isBlock) {
-      depth -= 1
-      node = $pos.node(depth)
-    }
-
-    if (!node || !node.isBlock) {
+    if (!found) {
       // Вышли из текста блока — сбрасываем pin и выбранный блок
       aiHandlePinned = false
       selectedNode = null
@@ -579,7 +603,8 @@ onMounted(() => {
       return
     }
 
-    const nodePos = $pos.before(depth)
+    const { node, depth } = found
+    const nodePos = selection.$from.before(depth)
     selectedNode = node
     selectedNodePos = nodePos
 
@@ -617,16 +642,9 @@ onMounted(() => {
         if (!pos) return
 
         const $pos = view.state.doc.resolve(pos.pos)
-        let depth = $pos.depth
-        let node = $pos.node(depth)
+        const found = resolveClauseNodeAtPos($pos)
 
-        // Поднимаемся до ближайшего блочного узла (параграф, заголовок и т.п.)
-        while (depth > 0 && !node.isBlock) {
-          depth -= 1
-          node = $pos.node(depth)
-        }
-
-        if (!node || !node.isBlock) {
+        if (!found) {
           // Клик вне блочного контента: сбрасываем pin и разблокируем drag-handle
           aiHandlePinned = false
           selectedNode = null
@@ -637,6 +655,7 @@ onMounted(() => {
           return
         }
 
+        const { node, depth } = found
         const nodePos = $pos.before(depth)
         selectedNode = node
         selectedNodePos = nodePos
@@ -667,12 +686,35 @@ onBeforeUnmount(() => {
 })
 
 const nodeChange = ({ node, pos }: { node: Node | null; pos: number }) => {
-  // В hover-режиме обновляем selectedNode/selectedNodePos как обычно.
+  // В hover-режиме хотим, чтобы hovered-блок для AI соответствовал
+  // именно "клаузе" (paragraph/heading внутри списка и т.п.),
+  // а не только внешнему контейнеру (ol/ul/table и т.д.).
   // В click-режиме НЕ сбрасываем aiHandlePinned при простом наведении —
   // сброс pin должен происходить только при явном клике по другому блоку (через selectionUpdate).
   if (activationMode.value === 'hover') {
-    selectedNode = node ?? null
-    if (pos !== null) {
+    if (!editor?.value || pos == null) {
+      selectedNode = node ?? null
+      selectedNodePos = pos
+      return
+    }
+
+    try {
+      const doc = editor.value.state.doc
+      // Смещаемся внутрь блока, чтобы оказаться "в теле" узла.
+      const $pos: any = doc.resolve(Math.min(pos + 1, doc.content.size))
+      const found = resolveClauseNodeAtPos($pos)
+
+      if (found) {
+        const { node: clauseNode, depth } = found
+        const clausePos = $pos.before(depth)
+        selectedNode = clauseNode
+        selectedNodePos = clausePos
+      } else {
+        selectedNode = node ?? null
+        selectedNodePos = pos
+      }
+    } catch {
+      selectedNode = node ?? null
       selectedNodePos = pos
     }
   }
