@@ -58,13 +58,20 @@ const buildConfig = {
         format: 'es' as const,
       },
     ],
-    // Важно: бандлим @tiptap/* внутрь пакета, чтобы не зависеть от версии
-    // Tiptap во внешнем приложении (apps/web использует Tiptap 3, а Umo — 2).
-    // Vue по-прежнему остаётся внешней зависимостью.
+    // Важно: бандлим @tiptap/* и все prosemirror/yjs-зависимости внутрь пакета,
+    // чтобы во внешнем приложении не возникало ситуации с двумя различными
+    // экземплярами prosemirror-model (это как раз приводит к RangeError
+    // "Can not convert <> to a Fragment"). Vue по-прежнему остаётся внешней.
     external: [
       'vue',
-      ...Object.keys(pkg.dependencies ?? {}).filter(
-        (dep) => !dep.startsWith('@tiptap/'),
+      ...Object.keys(pkg.dependencies ?? {}).filter((dep) =>
+        // Все @tiptap/*, prosemirror-*, y-prosemirror, y-protocols, yjs
+        // бандлим внутрь, а остальные зависимости оставляем external.
+        !dep.startsWith('@tiptap/') &&
+        !dep.startsWith('prosemirror-') &&
+        dep !== 'y-prosemirror' &&
+        dep !== 'y-protocols' &&
+        dep !== 'yjs',
       ),
       /^@vueuse\/.*/,
       /^nzh\/.*/,
