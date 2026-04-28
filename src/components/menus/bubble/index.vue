@@ -30,6 +30,8 @@ const tippyOpitons = $ref<Partial<Instance>>({
   appendTo: 'parent',
   maxWidth: 580,
   zIndex: 110,
+  // Небольшой сдвиг пузыря влево (~2em), чтобы он не прилипал к тексту.
+  offset: [-32, 0],
   onShow(instance: Instance) {
     tippyInstance = instance
   },

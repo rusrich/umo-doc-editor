@@ -331,6 +331,9 @@ const showBlockMenuClick = computed(() => {
 
 const tippyOpitons = $ref<Partial<Instance>>({
   zIndex: 20,
+  // Сдвигаем блоковое меню (drag-handle + AI) чуть влево от текста,
+  // чтобы панель не прилипала к началу строки.
+  offset: [-32, 0],
   popperOptions: {
     modifiers: [
       {
@@ -627,6 +630,12 @@ onMounted(() => {
       const target = event.target as HTMLElement | null
       if (!target) return
 
+      // В hover-режиме глобальный клик по редактору не должен переводить
+      // DragHandle в режим pin — оставляем управление только по hover.
+      if (activationMode.value !== 'click') {
+        return
+      }
+
       // Игнорируем клики по самим контролам DragHandle и AI-меню
       if (
         target.closest('.umo-block-menu-hander') ||
@@ -672,9 +681,19 @@ onMounted(() => {
       }
     }
 
+    const handleEditorMouseMove = () => {
+      // В hover-режиме принудительно держим drag-handle в режиме hover,
+      // даже если внутренняя логика плагина попыталась его залочить.
+      if (activationMode.value === 'hover' && ed.commands?.setMeta) {
+        ed.commands.setMeta('lockDragHandle', false as any)
+      }
+    }
+
     dom.addEventListener('click', handleEditorClick)
+    dom.addEventListener('mousemove', handleEditorMouseMove)
     editorClickCleanup = () => {
       dom.removeEventListener('click', handleEditorClick)
+      dom.removeEventListener('mousemove', handleEditorMouseMove)
     }
   }
 })
